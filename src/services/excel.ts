@@ -4,6 +4,13 @@ import { FamilyData } from '@/types/family';
 export class ExcelService {
   static exportFamiliesToExcel(families: FamilyData[]): void {
     try {
+      console.log('عدد العائلات للتصدير:', families.length);
+      console.log('البيانات:', families);
+      
+      if (families.length === 0) {
+        throw new Error('لا توجد بيانات للتصدير');
+      }
+      
       // إنشاء البيانات للتصدير
       const exportData = families.map(family => ({
         'اسم الزوج': family.husbandName,
@@ -29,9 +36,32 @@ export class ExcelService {
         'تاريخ التحديث': new Date(family.updatedAt).toLocaleDateString('ar-SA')
       }));
 
+      console.log('البيانات المُعدّة للتصدير:', exportData);
+
       // إنشاء ملف Excel
       const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.json_to_sheet(exportData);
+      const ws = XLSX.utils.json_to_sheet(exportData, {
+        header: [
+          'اسم الزوج',
+          'رقم هوية الزوج', 
+          'اسم الزوجة',
+          'رقم هوية الزوجة',
+          'حامل',
+          'مرضع',
+          'رقم الجوال',
+          'عدد أفراد العائلة',
+          'أفراد العائلة',
+          'يوجد أمراض',
+          'تفاصيل الأمراض',
+          'يوجد إعاقات',
+          'أنواع الإعاقات',
+          'إصابات حرب',
+          'أطفال أقل من سنتين',
+          'أطفال 2-5 سنوات',
+          'تاريخ الإضافة',
+          'تاريخ التحديث'
+        ]
+      });
       
       // تحسين عرض الأعمدة
       const colWidths = [
@@ -59,8 +89,11 @@ export class ExcelService {
       XLSX.utils.book_append_sheet(wb, ws, 'البيانات العائلية');
       
       // تصدير الملف
-      const fileName = `البيانات_العائلية_${new Date().toLocaleDateString('ar-SA')}.xlsx`;
+      const fileName = `البيانات_العائلية_${new Date().toISOString().split('T')[0]}.xlsx`;
+      console.log('اسم الملف:', fileName);
+      
       XLSX.writeFile(wb, fileName);
+      console.log('تم تصدير الملف بنجاح');
       
     } catch (error) {
       console.error('Error exporting to Excel:', error);
