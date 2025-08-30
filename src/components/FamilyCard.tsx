@@ -2,16 +2,17 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { FamilyData } from '@/types/family';
-import { Edit, Phone, Users, Calendar } from 'lucide-react';
+import { Edit, Phone, Users, Calendar, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
 interface FamilyCardProps {
   family: FamilyData;
   onEdit: () => void;
+  onDelete: () => void;
 }
 
-export const FamilyCard: React.FC<FamilyCardProps> = ({ family, onEdit }) => {
+export const FamilyCard: React.FC<FamilyCardProps> = ({ family, onEdit, onDelete }) => {
   return (
     <Card className="hover:shadow-card transition-all duration-300 bg-gradient-card border border-border/50 hover:border-primary/30">
       <CardHeader className="pb-3">
@@ -19,14 +20,24 @@ export const FamilyCard: React.FC<FamilyCardProps> = ({ family, onEdit }) => {
           <CardTitle className="text-lg font-semibold text-card-foreground">
             {family.husbandName}
           </CardTitle>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={onEdit}
-            className="text-primary hover:text-primary-deep hover:bg-primary/10"
-          >
-            <Edit className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={onEdit}
+              className="text-primary hover:text-primary-deep hover:bg-primary/10"
+            >
+              <Edit className="h-4 w-4" />
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={onDelete}
+              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </CardHeader>
       

@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Search, Users } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 const Index = () => {
   const [families, setFamilies] = useState<FamilyData[]>([]);
@@ -19,6 +20,7 @@ const Index = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingFamily, setEditingFamily] = useState<FamilyData | undefined>();
   const [showHelp, setShowHelp] = useState(false);
+  const [deletingFamily, setDeletingFamily] = useState<FamilyData | undefined>();
   const { toast } = useToast();
 
   // تحميل البيانات عند تحميل الصفحة
@@ -101,6 +103,35 @@ const Index = () => {
 
   const handleHelp = () => {
     setShowHelp(true);
+  };
+
+  const handleDelete = (family: FamilyData) => {
+    setDeletingFamily(family);
+  };
+
+  const confirmDelete = () => {
+    if (deletingFamily) {
+      try {
+        FamilyStorageService.deleteFamily(deletingFamily.id);
+        loadFamilies();
+        toast({
+          title: 'تم الحذف بنجاح',
+          description: `تم حذف عائلة ${deletingFamily.husbandName}`,
+        });
+      } catch (error) {
+        toast({
+          title: 'خطأ في الحذف',
+          description: 'حدث خطأ أثناء حذف العائلة',
+          variant: 'destructive'
+        });
+      } finally {
+        setDeletingFamily(undefined);
+      }
+    }
+  };
+
+  const cancelDelete = () => {
+    setDeletingFamily(undefined);
   };
 
   if (showForm) {
@@ -200,6 +231,7 @@ const Index = () => {
                     key={family.id}
                     family={family}
                     onEdit={() => handleEdit(family)}
+                    onDelete={() => handleDelete(family)}
                   />
                 ))}
               </div>
@@ -210,6 +242,28 @@ const Index = () => {
 
       {/* مربع حوار المساعدة */}
       <HelpDialog open={showHelp} onOpenChange={setShowHelp} />
+
+      {/* مربع حوار تأكيد الحذف */}
+      <AlertDialog open={!!deletingFamily} onOpenChange={() => setDeletingFamily(undefined)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>تأكيد الحذف</AlertDialogTitle>
+            <AlertDialogDescription>
+              هل أنت متأكد من حذف عائلة "{deletingFamily?.husbandName}"؟ 
+              لا يمكن التراجع عن هذا الإجراء.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={cancelDelete}>إلغاء</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmDelete}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              حذف
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
