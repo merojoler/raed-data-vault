@@ -30,10 +30,10 @@ const disabilityOptions = [
 const familySchema = z.object({
   husbandName: z.string().min(1, 'اسم الزوج مطلوب'),
   husbandId: z.string().regex(/^\d{9}$/, 'رقم الهوية يجب أن يكون 9 أرقام'),
-  husbandBirthDate: z.date({ required_error: 'تاريخ ميلاد الزوج مطلوب' }),
+  husbandBirthDate: z.string().min(1, 'تاريخ ميلاد الزوج مطلوب'),
   wifeName: z.string().min(1, 'اسم الزوجة مطلوب'),
   wifeId: z.string().regex(/^\d{9}$/, 'رقم الهوية يجب أن يكون 9 أرقام'),
-  wifeBirthDate: z.date({ required_error: 'تاريخ ميلاد الزوجة مطلوب' }),
+  wifeBirthDate: z.string().min(1, 'تاريخ ميلاد الزوجة مطلوب'),
   isPregnant: z.boolean(),
   isBreastfeeding: z.boolean(),
   phoneNumber: z.string().regex(/^\d{10}$/, 'رقم الجوال يجب أن يكون 10 أرقام'),
@@ -41,7 +41,7 @@ const familySchema = z.object({
   familySize: z.coerce.number().min(1, 'عدد أفراد العائلة مطلوب'),
   members: z.array(z.object({
     fullName: z.string().min(1, 'اسم الفرد مطلوب'),
-    birthDate: z.date({ required_error: 'تاريخ الميلاد مطلوب' }),
+    birthDate: z.string().min(1, 'تاريخ الميلاد مطلوب'),
     relationship: z.enum(relationshipOptions),
     healthStatus: z.string().optional()
   })),
@@ -84,10 +84,10 @@ export const FamilyForm: React.FC<FamilyFormProps> = ({
     defaultValues: {
       husbandName: existingFamily?.husbandName || '',
       husbandId: existingFamily?.husbandId || '',
-      husbandBirthDate: existingFamily?.husbandBirthDate ? new Date(existingFamily.husbandBirthDate) : new Date(),
+      husbandBirthDate: existingFamily?.husbandBirthDate ? existingFamily.husbandBirthDate.split('T')[0] : '',
       wifeName: existingFamily?.wifeName || '',
       wifeId: existingFamily?.wifeId || '',
-      wifeBirthDate: existingFamily?.wifeBirthDate ? new Date(existingFamily.wifeBirthDate) : new Date(),
+      wifeBirthDate: existingFamily?.wifeBirthDate ? existingFamily.wifeBirthDate.split('T')[0] : '',
       isPregnant: existingFamily?.isPregnant || false,
       isBreastfeeding: existingFamily?.isBreastfeeding || false,
       phoneNumber: existingFamily?.phoneNumber || '',
@@ -95,7 +95,7 @@ export const FamilyForm: React.FC<FamilyFormProps> = ({
       familySize: existingFamily?.familySize || 1,
       members: existingFamily?.members?.map(member => ({
         ...member,
-        birthDate: new Date(member.birthDate),
+        birthDate: member.birthDate.split('T')[0],
         healthStatus: member.healthStatus || ''
       })) || [],
       hasDiseases: existingFamily?.hasDiseases || false,
@@ -132,10 +132,10 @@ export const FamilyForm: React.FC<FamilyFormProps> = ({
         id: existingFamily?.id || crypto.randomUUID(),
         husbandName: data.husbandName,
         husbandId: data.husbandId,
-        husbandBirthDate: data.husbandBirthDate.toISOString(),
+        husbandBirthDate: new Date(data.husbandBirthDate).toISOString(),
         wifeName: data.wifeName,
         wifeId: data.wifeId,
-        wifeBirthDate: data.wifeBirthDate.toISOString(),
+        wifeBirthDate: new Date(data.wifeBirthDate).toISOString(),
         isPregnant: data.isPregnant,
         isBreastfeeding: data.isBreastfeeding,
         phoneNumber: data.phoneNumber,
@@ -145,7 +145,7 @@ export const FamilyForm: React.FC<FamilyFormProps> = ({
           id: crypto.randomUUID(),
           fullName: member.fullName,
           relationship: member.relationship,
-          birthDate: member.birthDate.toISOString(),
+          birthDate: new Date(member.birthDate).toISOString(),
           healthStatus: member.healthStatus
         })),
         hasDiseases: data.hasDiseases,
@@ -190,7 +190,7 @@ export const FamilyForm: React.FC<FamilyFormProps> = ({
   const addFamilyMember = () => {
     append({
       fullName: '',
-      birthDate: new Date(),
+      birthDate: '',
       relationship: 'ابن',
       healthStatus: ''
     });
@@ -253,36 +253,13 @@ export const FamilyForm: React.FC<FamilyFormProps> = ({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-base font-medium">تاريخ الميلاد *</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant="outline"
-                            className={cn(
-                              "w-full text-right font-normal",
-                              !field.value && "text-muted-foreground"
-                            )}
-                          >
-                            {field.value ? (
-                              format(field.value, 'dd MMMM yyyy', { locale: ar })
-                            ) : (
-                              <span>اختر التاريخ</span>
-                            )}
-                            <CalendarIcon className="mr-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          disabled={(date) => date > new Date()}
-                          initialFocus
-                          className="pointer-events-auto"
-                        />
-                      </PopoverContent>
-                    </Popover>
+                    <FormControl>
+                      <Input 
+                        type="date" 
+                        className="text-right" 
+                        {...field} 
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -333,36 +310,13 @@ export const FamilyForm: React.FC<FamilyFormProps> = ({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-base font-medium">تاريخ الميلاد *</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant="outline"
-                            className={cn(
-                              "w-full text-right font-normal",
-                              !field.value && "text-muted-foreground"
-                            )}
-                          >
-                            {field.value ? (
-                              format(field.value, 'dd MMMM yyyy', { locale: ar })
-                            ) : (
-                              <span>اختر التاريخ</span>
-                            )}
-                            <CalendarIcon className="mr-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          disabled={(date) => date > new Date()}
-                          initialFocus
-                          className="pointer-events-auto"
-                        />
-                      </PopoverContent>
-                    </Popover>
+                    <FormControl>
+                      <Input 
+                        type="date" 
+                        className="text-right" 
+                        {...field} 
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -535,36 +489,13 @@ export const FamilyForm: React.FC<FamilyFormProps> = ({
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel>تاريخ الميلاد</FormLabel>
-                              <Popover>
-                                <PopoverTrigger asChild>
-                                  <FormControl>
-                                    <Button
-                                      variant="outline"
-                                      className={cn(
-                                        "w-full text-right font-normal",
-                                        !field.value && "text-muted-foreground"
-                                      )}
-                                    >
-                                      {field.value ? (
-                                        format(field.value, 'dd MMMM yyyy', { locale: ar })
-                                      ) : (
-                                        <span>اختر التاريخ</span>
-                                      )}
-                                      <CalendarIcon className="mr-auto h-4 w-4 opacity-50" />
-                                    </Button>
-                                  </FormControl>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="start">
-                                  <Calendar
-                                    mode="single"
-                                    selected={field.value}
-                                    onSelect={field.onChange}
-                                    disabled={(date) => date > new Date()}
-                                    initialFocus
-                                    className="pointer-events-auto"
-                                  />
-                                </PopoverContent>
-                              </Popover>
+                              <FormControl>
+                                <Input 
+                                  type="date" 
+                                  className="text-right" 
+                                  {...field} 
+                                />
+                              </FormControl>
                               <FormMessage />
                             </FormItem>
                           )}

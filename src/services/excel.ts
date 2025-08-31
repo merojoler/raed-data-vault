@@ -24,9 +24,12 @@ export class ExcelService {
         'رقم الجوال الأساسي': family.phoneNumber,
         'رقم الجوال البديل': family.alternativePhoneNumber || 'غير محدد',
         'عدد أفراد العائلة': family.familySize,
-        'أفراد العائلة': family.members.map(member => 
-          `${member.fullName} (${member.relationship}) - ${new Date(member.birthDate).toLocaleDateString('ar-SA')}${member.healthStatus ? ` - الحالة الصحية: ${member.healthStatus}` : ''}`
-        ).join(' | '),
+        'أفراد العائلة': family.members.map((member, index) => 
+          `${index + 1}. ${member.fullName} (${member.relationship})
+   تاريخ الميلاد: ${new Date(member.birthDate).toLocaleDateString('ar-SA')}${member.healthStatus ? `
+   الحالة الصحية: ${member.healthStatus}` : ''}
+`
+        ).join('\n'),
         'يوجد أمراض': family.hasDiseases ? 'نعم' : 'لا',
         'تفاصيل الأمراض': family.diseaseDetails || '',
         'يوجد إعاقات': family.hasDisabilities ? 'نعم' : 'لا',
