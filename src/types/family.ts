@@ -3,6 +3,7 @@ export interface FamilyMember {
   fullName: string;
   birthDate: string;
   relationship: 'أب' | 'أم' | 'ابن' | 'ابنة' | 'أخ' | 'أخت' | 'جد' | 'جدة' | 'آخر';
+  healthStatus?: string;
 }
 
 export interface DisabilityType {
@@ -22,15 +23,18 @@ export interface FamilyData {
   // بيانات الزوج
   husbandName: string;
   husbandId: string;
+  husbandBirthDate: string;
   
   // بيانات الزوجة
   wifeName: string;
   wifeId: string;
+  wifeBirthDate: string;
   isPregnant: boolean;
   isBreastfeeding: boolean;
   
   // معلومات التواصل
   phoneNumber: string;
+  alternativePhoneNumber?: string;
   familySize: number;
   
   // أفراد العائلة

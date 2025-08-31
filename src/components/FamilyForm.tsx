@@ -29,17 +29,21 @@ const disabilityOptions = [
 
 const familySchema = z.object({
   husbandName: z.string().min(1, 'اسم الزوج مطلوب'),
-  husbandId: z.string().min(1, 'رقم هوية الزوج مطلوب'),
+  husbandId: z.string().regex(/^\d{9}$/, 'رقم الهوية يجب أن يكون 9 أرقام'),
+  husbandBirthDate: z.date({ required_error: 'تاريخ ميلاد الزوج مطلوب' }),
   wifeName: z.string().min(1, 'اسم الزوجة مطلوب'),
-  wifeId: z.string().min(1, 'رقم هوية الزوجة مطلوب'),
+  wifeId: z.string().regex(/^\d{9}$/, 'رقم الهوية يجب أن يكون 9 أرقام'),
+  wifeBirthDate: z.date({ required_error: 'تاريخ ميلاد الزوجة مطلوب' }),
   isPregnant: z.boolean(),
   isBreastfeeding: z.boolean(),
-  phoneNumber: z.string().min(1, 'رقم الجوال مطلوب'),
+  phoneNumber: z.string().regex(/^\d{10}$/, 'رقم الجوال يجب أن يكون 10 أرقام'),
+  alternativePhoneNumber: z.string().regex(/^\d{10}$/, 'رقم الجوال البديل يجب أن يكون 10 أرقام').optional().or(z.literal('')),
   familySize: z.coerce.number().min(1, 'عدد أفراد العائلة مطلوب'),
   members: z.array(z.object({
     fullName: z.string().min(1, 'اسم الفرد مطلوب'),
     birthDate: z.date({ required_error: 'تاريخ الميلاد مطلوب' }),
-    relationship: z.enum(relationshipOptions)
+    relationship: z.enum(relationshipOptions),
+    healthStatus: z.string().optional()
   })),
   hasDiseases: z.boolean(),
   diseaseDetails: z.string().optional(),
@@ -80,15 +84,19 @@ export const FamilyForm: React.FC<FamilyFormProps> = ({
     defaultValues: {
       husbandName: existingFamily?.husbandName || '',
       husbandId: existingFamily?.husbandId || '',
+      husbandBirthDate: existingFamily?.husbandBirthDate ? new Date(existingFamily.husbandBirthDate) : new Date(),
       wifeName: existingFamily?.wifeName || '',
       wifeId: existingFamily?.wifeId || '',
+      wifeBirthDate: existingFamily?.wifeBirthDate ? new Date(existingFamily.wifeBirthDate) : new Date(),
       isPregnant: existingFamily?.isPregnant || false,
       isBreastfeeding: existingFamily?.isBreastfeeding || false,
       phoneNumber: existingFamily?.phoneNumber || '',
+      alternativePhoneNumber: existingFamily?.alternativePhoneNumber || '',
       familySize: existingFamily?.familySize || 1,
       members: existingFamily?.members?.map(member => ({
         ...member,
-        birthDate: new Date(member.birthDate)
+        birthDate: new Date(member.birthDate),
+        healthStatus: member.healthStatus || ''
       })) || [],
       hasDiseases: existingFamily?.hasDiseases || false,
       diseaseDetails: existingFamily?.diseaseDetails || '',
@@ -124,17 +132,21 @@ export const FamilyForm: React.FC<FamilyFormProps> = ({
         id: existingFamily?.id || crypto.randomUUID(),
         husbandName: data.husbandName,
         husbandId: data.husbandId,
+        husbandBirthDate: data.husbandBirthDate.toISOString(),
         wifeName: data.wifeName,
         wifeId: data.wifeId,
+        wifeBirthDate: data.wifeBirthDate.toISOString(),
         isPregnant: data.isPregnant,
         isBreastfeeding: data.isBreastfeeding,
         phoneNumber: data.phoneNumber,
+        alternativePhoneNumber: data.alternativePhoneNumber || undefined,
         familySize: data.familySize,
         members: data.members.map(member => ({
           id: crypto.randomUUID(),
           fullName: member.fullName,
           relationship: member.relationship,
-          birthDate: member.birthDate.toISOString()
+          birthDate: member.birthDate.toISOString(),
+          healthStatus: member.healthStatus
         })),
         hasDiseases: data.hasDiseases,
         diseaseDetails: data.diseaseDetails,
@@ -179,7 +191,8 @@ export const FamilyForm: React.FC<FamilyFormProps> = ({
     append({
       fullName: '',
       birthDate: new Date(),
-      relationship: 'ابن'
+      relationship: 'ابن',
+      healthStatus: ''
     });
   };
 
@@ -227,8 +240,49 @@ export const FamilyForm: React.FC<FamilyFormProps> = ({
                   <FormItem>
                     <FormLabel className="text-base font-medium">رقم الهوية *</FormLabel>
                     <FormControl>
-                      <Input placeholder="أدخل رقم الهوية" className="text-right" {...field} />
+                      <Input placeholder="أدخل رقم الهوية (9 أرقام)" className="text-right" {...field} />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="husbandBirthDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-base font-medium">تاريخ الميلاد *</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-full text-right font-normal",
+                              !field.value && "text-muted-foreground"
+                            )}
+                          >
+                            {field.value ? (
+                              format(field.value, 'dd MMMM yyyy', { locale: ar })
+                            ) : (
+                              <span>اختر التاريخ</span>
+                            )}
+                            <CalendarIcon className="mr-auto h-4 w-4 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          disabled={(date) => date > new Date()}
+                          initialFocus
+                          className="pointer-events-auto"
+                        />
+                      </PopoverContent>
+                    </Popover>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -266,8 +320,49 @@ export const FamilyForm: React.FC<FamilyFormProps> = ({
                   <FormItem>
                     <FormLabel className="text-base font-medium">رقم الهوية *</FormLabel>
                     <FormControl>
-                      <Input placeholder="أدخل رقم الهوية" className="text-right" {...field} />
+                      <Input placeholder="أدخل رقم الهوية (9 أرقام)" className="text-right" {...field} />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="wifeBirthDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-base font-medium">تاريخ الميلاد *</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-full text-right font-normal",
+                              !field.value && "text-muted-foreground"
+                            )}
+                          >
+                            {field.value ? (
+                              format(field.value, 'dd MMMM yyyy', { locale: ar })
+                            ) : (
+                              <span>اختر التاريخ</span>
+                            )}
+                            <CalendarIcon className="mr-auto h-4 w-4 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          disabled={(date) => date > new Date()}
+                          initialFocus
+                          className="pointer-events-auto"
+                        />
+                      </PopoverContent>
+                    </Popover>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -328,7 +423,7 @@ export const FamilyForm: React.FC<FamilyFormProps> = ({
                   name="phoneNumber"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-base font-medium">رقم الجوال *</FormLabel>
+                      <FormLabel className="text-base font-medium">رقم الجوال الأساسي *</FormLabel>
                       <FormControl>
                         <Input placeholder="مثال: 0591234567" className="text-right" {...field} />
                       </FormControl>
@@ -339,18 +434,32 @@ export const FamilyForm: React.FC<FamilyFormProps> = ({
 
                 <FormField
                   control={form.control}
-                  name="familySize"
+                  name="alternativePhoneNumber"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-base font-medium">عدد أفراد العائلة *</FormLabel>
+                      <FormLabel className="text-base font-medium">رقم الجوال البديل</FormLabel>
                       <FormControl>
-                        <Input type="number" min="1" placeholder="أدخل العدد" className="text-right" {...field} />
+                        <Input placeholder="مثال: 0591234567 (اختياري)" className="text-right" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
+
+              <FormField
+                control={form.control}
+                name="familySize"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-base font-medium">عدد أفراد العائلة *</FormLabel>
+                    <FormControl>
+                      <Input type="number" min="1" placeholder="أدخل العدد" className="text-right" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </CardContent>
           </Card>
 
@@ -405,7 +514,7 @@ export const FamilyForm: React.FC<FamilyFormProps> = ({
                         </Button>
                       </div>
                       
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <FormField
                           control={form.control}
                           name={`members.${index}.fullName`}
@@ -460,7 +569,9 @@ export const FamilyForm: React.FC<FamilyFormProps> = ({
                             </FormItem>
                           )}
                         />
+                      </div>
 
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <FormField
                           control={form.control}
                           name={`members.${index}.relationship`}
@@ -481,6 +592,20 @@ export const FamilyForm: React.FC<FamilyFormProps> = ({
                                   ))}
                                 </SelectContent>
                               </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name={`members.${index}.healthStatus`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>الحالة الصحية</FormLabel>
+                              <FormControl>
+                                <Input placeholder="حالة صحية خاصة (اختياري)" className="text-right" {...field} />
+                              </FormControl>
                               <FormMessage />
                             </FormItem>
                           )}
