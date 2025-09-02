@@ -1,10 +1,9 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { FamilyData } from '@/types/family';
-import { Edit, Phone, Users, Calendar, Trash2 } from 'lucide-react';
-import { format } from 'date-fns';
-import { ar } from 'date-fns/locale';
+import { Users, Phone, Edit, Trash2, Crown, Heart, Baby, AlertCircle } from 'lucide-react';
 
 interface FamilyCardProps {
   family: FamilyData;
@@ -13,77 +12,120 @@ interface FamilyCardProps {
 }
 
 export const FamilyCard: React.FC<FamilyCardProps> = ({ family, onEdit, onDelete }) => {
+  const headOfHousehold = family.members.find(member => member.relationship === 'Head');
+  const spouse = family.members.find(member => member.relationship === 'Spouse');
+  const children = family.members.filter(member => member.relationship === 'Son' || member.relationship === 'Daughter');
+
   return (
-    <Card className="hover:shadow-card transition-all duration-300 bg-gradient-card border border-border/50 hover:border-primary/30">
+    <Card className="hover:shadow-lg transition-all duration-300 border-l-4 border-l-primary">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-semibold text-card-foreground">
-            {family.husbandName}
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Crown className="h-5 w-5 text-yellow-600" />
+            {family.headOfHouseholdName}
           </CardTitle>
-          <div className="flex items-center gap-1">
-            <Button 
-              variant="ghost" 
-              size="sm" 
+          <div className="flex gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={onEdit}
-              className="text-primary hover:text-primary-deep hover:bg-primary/10"
+              className="h-8 w-8 p-0 hover:bg-primary/10"
             >
-              <Edit className="h-4 w-4" />
+              <Edit className="h-4 w-4 text-primary" />
             </Button>
-            <Button 
-              variant="ghost" 
-              size="sm" 
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={onDelete}
-              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+              className="h-8 w-8 p-0 hover:bg-destructive/10"
             >
-              <Trash2 className="h-4 w-4" />
+              <Trash2 className="h-4 w-4 text-destructive" />
             </Button>
           </div>
         </div>
       </CardHeader>
-      
-      <CardContent className="space-y-3">
+
+      <CardContent className="space-y-4">
+        {/* معلومات التواصل */}
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Phone className="h-4 w-4 text-primary" />
-          <span className="font-medium">{family.phoneNumber}</span>
+          <Phone className="h-4 w-4" />
+          <span dir="ltr">{family.contactNumber}</span>
         </div>
-        
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+
+        {/* عدد أفراد العائلة */}
+        <div className="flex items-center gap-2 text-sm">
           <Users className="h-4 w-4 text-primary" />
-          <span>عدد الأفراد: <span className="font-medium text-foreground">{family.familySize}</span></span>
+          <span>عدد الأفراد: <strong>{family.members.length}</strong></span>
         </div>
-        
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Calendar className="h-4 w-4 text-primary" />
-          <span>
-            أضيف في: {' '}
-            <span className="font-medium text-foreground">
-              {format(new Date(family.createdAt), 'dd MMMM yyyy', { locale: ar })}
-            </span>
-          </span>
+
+        {/* معلومات الأفراد */}
+        <div className="space-y-2">
+          {headOfHousehold && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="flex items-center gap-1">
+                <Crown className="h-3 w-3 text-yellow-600" />
+                رب الأسرة
+              </span>
+              <span className="font-medium">{headOfHousehold.fullName}</span>
+            </div>
+          )}
+          
+          {spouse && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="flex items-center gap-1">
+                <Heart className="h-3 w-3 text-pink-600" />
+                الزوج/ة
+              </span>
+              <span className="font-medium">{spouse.fullName}</span>
+            </div>
+          )}
+
+          {children.length > 0 && (
+            <div className="text-sm">
+              <span className="flex items-center gap-1 mb-1">
+                <Baby className="h-3 w-3 text-blue-600" />
+                الأطفال ({children.length})
+              </span>
+              <div className="mr-4 space-y-1">
+                {children.slice(0, 3).map((child, index) => (
+                  <div key={index} className="text-xs text-muted-foreground">
+                    • {child.fullName} ({child.age} سنة)
+                  </div>
+                ))}
+                {children.length > 3 && (
+                  <div className="text-xs text-muted-foreground">
+                    وآخرون...
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
-        
-        {family.wifeName && (
-          <div className="pt-2 border-t border-border/50">
-            <p className="text-sm text-muted-foreground">
-              الزوجة: <span className="font-medium text-foreground">{family.wifeName}</span>
-            </p>
-          </div>
-        )}
-        
-        {(family.isPregnant || family.isBreastfeeding) && (
-          <div className="flex gap-2 pt-1">
-            {family.isPregnant && (
-              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-accent/50 text-accent-foreground">
-                حامل
-              </span>
-            )}
-            {family.isBreastfeeding && (
-              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-secondary/70 text-secondary-foreground">
-                مرضع
-              </span>
-            )}
-          </div>
-        )}
+
+        {/* حالات خاصة */}
+        <div className="flex flex-wrap gap-2">
+          {family.isPregnant && (
+            <Badge variant="secondary" className="text-xs bg-pink-100 text-pink-700">
+              حامل
+            </Badge>
+          )}
+          {family.isBreastfeeding && (
+            <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700">
+              مرضع
+            </Badge>
+          )}
+          {family.hasUnaccompaniedChild && (
+            <Badge variant="destructive" className="text-xs">
+              <AlertCircle className="h-3 w-3 mr-1" />
+              طفل غير مصحوب
+            </Badge>
+          )}
+        </div>
+
+        {/* تاريخ الإدخال */}
+        <div className="text-xs text-muted-foreground pt-2 border-t">
+          تاريخ الإدخال: {new Date(family.entryDate).toLocaleDateString('ar-SA')}
+        </div>
       </CardContent>
     </Card>
   );

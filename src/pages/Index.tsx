@@ -21,6 +21,7 @@ const Index = () => {
   const [editingFamily, setEditingFamily] = useState<FamilyData | undefined>();
   const [showHelp, setShowHelp] = useState(false);
   const [deletingFamily, setDeletingFamily] = useState<FamilyData | undefined>();
+  const [showDeleteAllDialog, setShowDeleteAllDialog] = useState(false);
   const { toast } = useToast();
 
   // تحميل البيانات عند تحميل الصفحة
@@ -34,9 +35,11 @@ const Index = () => {
       setFilteredFamilies(families);
     } else {
       const filtered = families.filter(family =>
-        family.husbandName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        family.wifeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        family.phoneNumber.includes(searchTerm)
+        family.headOfHouseholdName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        family.contactNumber.includes(searchTerm) ||
+        family.members.some(member => 
+          member.fullName.toLowerCase().includes(searchTerm.toLowerCase())
+        )
       );
       setFilteredFamilies(filtered);
     }
@@ -174,7 +177,7 @@ const Index = () => {
         loadFamilies();
         toast({
           title: 'تم الحذف بنجاح',
-          description: `تم حذف عائلة ${deletingFamily.husbandName}`,
+          description: `تم حذف عائلة ${deletingFamily.headOfHouseholdName}`,
         });
       } catch (error) {
         toast({
@@ -190,6 +193,33 @@ const Index = () => {
 
   const cancelDelete = () => {
     setDeletingFamily(undefined);
+  };
+
+  const handleDeleteAll = () => {
+    setShowDeleteAllDialog(true);
+  };
+
+  const confirmDeleteAll = () => {
+    try {
+      FamilyStorageService.deleteAllFamilies();
+      loadFamilies();
+      toast({
+        title: 'تم حذف جميع البيانات',
+        description: 'تم حذف جميع العائلات بنجاح',
+      });
+    } catch (error) {
+      toast({
+        title: 'خطأ في الحذف',
+        description: 'حدث خطأ أثناء حذف البيانات',
+        variant: 'destructive'
+      });
+    } finally {
+      setShowDeleteAllDialog(false);
+    }
+  };
+
+  const cancelDeleteAll = () => {
+    setShowDeleteAllDialog(false);
   };
 
   if (showForm) {
@@ -210,6 +240,7 @@ const Index = () => {
         onAddNew={handleAddNew}
         onExport={handleExport}
         onImport={handleImport}
+        onDeleteAll={handleDeleteAll}
         onHelp={handleHelp}
         familyCount={families.length}
       />
@@ -308,7 +339,7 @@ const Index = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>تأكيد الحذف</AlertDialogTitle>
             <AlertDialogDescription>
-              هل أنت متأكد من حذف عائلة "{deletingFamily?.husbandName}"؟ 
+              هل أنت متأكد من حذف عائلة "{deletingFamily?.headOfHouseholdName}"؟ 
               لا يمكن التراجع عن هذا الإجراء.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -319,6 +350,28 @@ const Index = () => {
               className="bg-destructive hover:bg-destructive/90"
             >
               حذف
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* مربع حوار تأكيد حذف جميع البيانات */}
+      <AlertDialog open={showDeleteAllDialog} onOpenChange={setShowDeleteAllDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>تأكيد حذف جميع البيانات</AlertDialogTitle>
+            <AlertDialogDescription>
+              هل أنت متأكد من حذف جميع البيانات؟ سيتم حذف جميع العائلات ({families.length} عائلة).
+              لا يمكن التراجع عن هذا الإجراء.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={cancelDeleteAll}>إلغاء</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmDeleteAll}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              حذف جميع البيانات
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

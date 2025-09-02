@@ -1,16 +1,17 @@
 import React, { useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { Plus, FileSpreadsheet, HelpCircle, Database, Upload, Users } from 'lucide-react';
+import { Plus, FileSpreadsheet, HelpCircle, Database, Upload, Users, Trash2 } from 'lucide-react';
 
 interface HeaderProps {
   onAddNew: () => void;
   onExport: () => void;
   onImport: (file: File) => void;
+  onDeleteAll: () => void;
   onHelp: () => void;
   familyCount: number;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onAddNew, onExport, onImport, onHelp, familyCount }) => {
+export const Header: React.FC<HeaderProps> = ({ onAddNew, onExport, onImport, onDeleteAll, onHelp, familyCount }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleImportClick = () => {
@@ -78,6 +79,17 @@ export const Header: React.FC<HeaderProps> = ({ onAddNew, onExport, onImport, on
           >
             <Upload className="ml-2 h-5 w-5" />
             استيراد من Excel
+          </Button>
+
+          <Button 
+            onClick={onDeleteAll}
+            variant="outline"
+            className="bg-red-500/20 hover:bg-red-500/30 text-white border-red-400/40 hover:border-red-400/60 backdrop-blur-sm transition-all duration-300"
+            size="lg"
+            disabled={familyCount === 0}
+          >
+            <Trash2 className="ml-2 h-5 w-5" />
+            حذف جميع البيانات
           </Button>
 
           <input

@@ -1,55 +1,63 @@
 export interface FamilyMember {
   id: string;
   fullName: string;
+  identityNumber: string;
   birthDate: string;
-  relationship: 'أب' | 'أم' | 'ابن' | 'ابنة' | 'أخ' | 'أخت' | 'جد' | 'جدة' | 'آخر';
-  healthStatus?: string;
-}
-
-export interface DisabilityType {
-  بصرية: boolean;
-  سمعية: boolean;
-  حركية: boolean;
-  ذهنية: boolean;
-  نفسية: boolean;
-  التوحد: boolean;
-  متعددة: boolean;
-  أخرى: boolean;
+  age: number;
+  gender: 'M' | 'F';
+  relationship: 'Head' | 'Spouse' | 'Son' | 'Daughter';
+  maritalStatus: 'متزوج' | 'أعزب' | 'أرمل' | 'مطلق' | 'مهجور';
+  
+  // الحالة الصحية والإعاقات
+  hasChronicIllness: boolean;
+  chronicIllnesses: {
+    diabetes: boolean;
+    hypertension: boolean;
+    heartDisease: boolean;
+    asthma: boolean;
+    cancer: boolean;
+    kidneyDisease: boolean;
+    hiv: boolean;
+    arthritis: boolean;
+  };
+  
+  hasDisabilities: boolean;
+  disabilities: {
+    physical: boolean;
+    visual: boolean;
+    hearing: boolean;
+    intellectual: boolean;
+    mentalPsychological: boolean;
+  };
+  
+  isUXOVictim: boolean;
+  hasStableIncome: boolean;
 }
 
 export interface FamilyData {
   id: string;
+  entryDate: string; // تاريخ الإدخال التلقائي
   
-  // بيانات الزوج
-  husbandName: string;
-  husbandId: string;
-  husbandBirthDate: string;
+  // معلومات رب الأسرة
+  headOfHouseholdName: string;
+  headOfHouseholdId: string;
   
-  // بيانات الزوجة
-  wifeName: string;
-  wifeId: string;
-  wifeBirthDate: string;
+  // معلومات التواصل (لرب الأسرة فقط)
+  contactNumber: string;
+  
+  // أفراد العائلة (يشمل رب الأسرة)
+  members: FamilyMember[];
+  
+  // معلومات خاصة
   isPregnant: boolean;
   isBreastfeeding: boolean;
   
-  // معلومات التواصل
-  phoneNumber: string;
-  alternativePhoneNumber?: string;
-  familySize: number;
-  
-  // أفراد العائلة
-  members: FamilyMember[];
-  
-  // معلومات صحية
-  hasDiseases: boolean;
-  diseaseDetails?: string;
-  hasDisabilities: boolean;
-  disabilityTypes: DisabilityType;
-  hasWarInjuries: boolean;
-  
-  // معلومات الأطفال
-  hasChildrenUnder2: boolean;
-  hasChildren2to5: boolean;
+  // طفل غير مصحوب
+  hasUnaccompaniedChild: boolean;
+  unaccompaniedChildDetails?: {
+    name: string;
+    details: string;
+  };
   
   // تاريخ الإضافة والتحديث
   createdAt: Date;

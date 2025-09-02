@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import { FamilyData } from '@/types/family';
+import { FamilyData, FamilyMember } from '@/types/family';
 
 export class ExcelService {
   static importFamiliesFromExcel(file: File): Promise<FamilyData[]> {
@@ -13,78 +13,34 @@ export class ExcelService {
           const sheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[sheetName];
           
-          // تحويل البيانات إلى JSON
           const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
           
           if (rawData.length < 2) {
             throw new Error('الملف فارغ أو لا يحتوي على بيانات صحيحة');
           }
           
-          // تجاهل الصف الأول (العناوين) والبدء من الصف الثاني
           const dataRows = rawData.slice(1) as any[];
           
           const importedFamilies: FamilyData[] = dataRows
-            .filter(row => row.length > 0 && row[0]) // التأكد من وجود بيانات في الصف
+            .filter(row => row.length > 0 && row[0])
             .map((row, index) => {
               try {
-                // تحليل بيانات أفراد العائلة
-                const membersText = row[11] || '';
-                const members: any[] = [];
-                
-                if (membersText && typeof membersText === 'string') {
-                  const memberLines = membersText.split('\n').filter(line => line.trim());
-                  memberLines.forEach(line => {
-                    const nameMatch = line.match(/\d+\.\s*(.+?)\s*\((.+?)\)/);
-                    const birthMatch = line.match(/تاريخ الميلاد:\s*(.+)/);
-                    const healthMatch = line.match(/الحالة الصحية:\s*(.+)/);
-                    
-                    if (nameMatch) {
-                      const member = {
-                        id: `member-${Date.now()}-${Math.random()}`,
-                        fullName: nameMatch[1].trim(),
-                        relationship: nameMatch[2].trim(),
-                        birthDate: birthMatch ? birthMatch[1].trim() : '',
-                        healthStatus: healthMatch ? healthMatch[1].trim() : ''
-                      };
-                      members.push(member);
-                    }
-                  });
-                }
-                
-                // تحليل أنواع الإعاقات
-                const disabilityTypesText = row[15] || '';
-                const disabilityTypes = {
-                  بصرية: disabilityTypesText.includes('بصرية'),
-                  سمعية: disabilityTypesText.includes('سمعية'),
-                  حركية: disabilityTypesText.includes('حركية'),
-                  ذهنية: disabilityTypesText.includes('ذهنية'),
-                  نفسية: disabilityTypesText.includes('نفسية'),
-                  التوحد: disabilityTypesText.includes('التوحد'),
-                  متعددة: disabilityTypesText.includes('متعددة'),
-                  أخرى: disabilityTypesText.includes('أخرى')
-                };
+                const today = new Date().toISOString().split('T')[0];
                 
                 const family: FamilyData = {
                   id: `family-${Date.now()}-${index}`,
-                  husbandName: row[0] || '',
-                  husbandId: row[1] || '',
-                  husbandBirthDate: row[2] || '',
-                  wifeName: row[3] || '',
-                  wifeId: row[4] || '',
-                  wifeBirthDate: row[5] || '',
-                  isPregnant: row[6] === 'نعم',
-                  isBreastfeeding: row[7] === 'نعم',
-                  phoneNumber: row[8] || '',
-                  alternativePhoneNumber: row[9] === 'غير محدد' ? '' : row[9] || '',
-                  familySize: parseInt(row[10]) || members.length,
-                  members: members,
-                  hasDiseases: row[12] === 'نعم',
-                  diseaseDetails: row[13] || '',
-                  hasDisabilities: row[14] === 'نعم',
-                  disabilityTypes: disabilityTypes,
-                  hasWarInjuries: row[16] === 'نعم',
-                  hasChildrenUnder2: row[17] === 'نعم',
-                  hasChildren2to5: row[18] === 'نعم',
+                  entryDate: today,
+                  headOfHouseholdName: row[2] || '',
+                  headOfHouseholdId: row[3] || '',
+                  contactNumber: row[4] || '',
+                  members: [], // سيتم ملؤها لاحقاً
+                  isPregnant: row[5] === 'نعم' || row[5] === 'Yes',
+                  isBreastfeeding: row[6] === 'نعم' || row[6] === 'Yes',
+                  hasUnaccompaniedChild: row[7] === 'نعم' || row[7] === 'Yes',
+                  unaccompaniedChildDetails: row[7] === 'نعم' || row[7] === 'Yes' ? {
+                    name: row[8] || '',
+                    details: row[9] || ''
+                  } : undefined,
                   createdAt: new Date(),
                   updatedAt: new Date()
                 };
@@ -96,7 +52,6 @@ export class ExcelService {
               }
             });
           
-          console.log('تم استيراد العائلات:', importedFamilies);
           resolve(importedFamilies);
           
         } catch (error) {
@@ -115,110 +70,135 @@ export class ExcelService {
 
   static exportFamiliesToExcel(families: FamilyData[]): void {
     try {
-      console.log('عدد العائلات للتصدير:', families.length);
-      console.log('البيانات:', families);
-      
       if (families.length === 0) {
         throw new Error('لا توجد بيانات للتصدير');
       }
       
-      // إنشاء البيانات للتصدير
-      const exportData = families.map(family => ({
-        'اسم الزوج': family.husbandName,
-        'رقم هوية الزوج': family.husbandId,
-        'تاريخ ميلاد الزوج': new Date(family.husbandBirthDate).toLocaleDateString('ar-SA'),
-        'اسم الزوجة': family.wifeName,
-        'رقم هوية الزوجة': family.wifeId,
-        'تاريخ ميلاد الزوجة': new Date(family.wifeBirthDate).toLocaleDateString('ar-SA'),
-        'حامل': family.isPregnant ? 'نعم' : 'لا',
-        'مرضع': family.isBreastfeeding ? 'نعم' : 'لا',
-        'رقم الجوال الأساسي': family.phoneNumber,
-        'رقم الجوال البديل': family.alternativePhoneNumber || 'غير محدد',
-        'عدد أفراد العائلة': family.familySize,
-        'أفراد العائلة': family.members.map((member, index) => 
-          `${index + 1}. ${member.fullName} (${member.relationship})
-   تاريخ الميلاد: ${new Date(member.birthDate).toLocaleDateString('ar-SA')}${member.healthStatus ? `
-   الحالة الصحية: ${member.healthStatus}` : ''}
-`
-        ).join('\n'),
-        'يوجد أمراض': family.hasDiseases ? 'نعم' : 'لا',
-        'تفاصيل الأمراض': family.diseaseDetails || '',
-        'يوجد إعاقات': family.hasDisabilities ? 'نعم' : 'لا',
-        'أنواع الإعاقات': Object.entries(family.disabilityTypes)
-          .filter(([_, value]) => value)
-          .map(([key]) => key)
-          .join(', '),
-        'إصابات حرب': family.hasWarInjuries ? 'نعم' : 'لا',
-        'أطفال أقل من سنتين': family.hasChildrenUnder2 ? 'نعم' : 'لا',
-        'أطفال 2-5 سنوات': family.hasChildren2to5 ? 'نعم' : 'لا',
-        'تاريخ الإضافة': new Date(family.createdAt).toLocaleDateString('ar-SA'),
-        'تاريخ التحديث': new Date(family.updatedAt).toLocaleDateString('ar-SA')
-      }));
-
-      console.log('البيانات المُعدّة للتصدير:', exportData);
-
-      // إنشاء ملف Excel
-      const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.json_to_sheet(exportData, {
-        header: [
-          'اسم الزوج',
-          'رقم هوية الزوج',
-          'تاريخ ميلاد الزوج',
-          'اسم الزوجة',
-          'رقم هوية الزوجة',
-          'تاريخ ميلاد الزوجة',
-          'حامل',
-          'مرضع',
-          'رقم الجوال الأساسي',
-          'رقم الجوال البديل',
-          'عدد أفراد العائلة',
-          'أفراد العائلة',
-          'يوجد أمراض',
-          'تفاصيل الأمراض',
-          'يوجد إعاقات',
-          'أنواع الإعاقات',
-          'إصابات حرب',
-          'أطفال أقل من سنتين',
-          'أطفال 2-5 سنوات',
-          'تاريخ الإضافة',
-          'تاريخ التحديث'
-        ]
+      const exportData: any[] = [];
+      
+      families.forEach(family => {
+        // ترتيب الأعضاء: رب الأسرة أولاً، ثم الزوج/ة، ثم الأطفال
+        const sortedMembers = [...family.members].sort((a, b) => {
+          const order = { 'Head': 0, 'Spouse': 1, 'Son': 2, 'Daughter': 3 };
+          return order[a.relationship] - order[b.relationship];
+        });
+        
+        sortedMembers.forEach((member, memberIndex) => {
+          const chronicIllnessList = Object.entries(member.chronicIllnesses)
+            .filter(([_, value]) => value)
+            .map(([key, _]) => {
+              const illnessNames: Record<string, string> = {
+                diabetes: 'سكري',
+                hypertension: 'ضغط',
+                heartDisease: 'أمراض قلب',
+                asthma: 'أزمة',
+                cancer: 'سرطان',
+                kidneyDisease: 'أمراض كلى',
+                hiv: 'إيدز',
+                arthritis: 'التهاب مفاصل'
+              };
+              return illnessNames[key] || key;
+            });
+          
+          const disabilitiesList = Object.entries(member.disabilities)
+            .filter(([_, value]) => value)
+            .map(([key, _]) => {
+              const disabilityNames: Record<string, string> = {
+                physical: 'حركية',
+                visual: 'بصرية',
+                hearing: 'سمعية',
+                intellectual: 'ذهنية',
+                mentalPsychological: 'عقلية - نفسية'
+              };
+              return disabilityNames[key] || key;
+            });
+          
+          const relationshipNames: Record<string, string> = {
+            'Head': 'رب الأسرة',
+            'Spouse': 'زوج/زوجة',
+            'Son': 'ابن',
+            'Daughter': 'ابنة'
+          };
+          
+          exportData.push({
+            'Entry Date': family.entryDate,
+            'Enumerator Nam': family.headOfHouseholdName,
+            'HH Head': memberIndex === 0 ? family.headOfHouseholdName : '',
+            'Full Name': member.fullName,
+            'National ID': member.identityNumber,
+            'Date of Birth': new Date(member.birthDate).toLocaleDateString('en-CA'),
+            'Gender (F/M)': member.gender,
+            'Contact Num': memberIndex === 0 ? family.contactNumber : '',
+            'Marital Stat': member.maritalStatus,
+            'Relation to HH Head': relationshipNames[member.relationship] || member.relationship,
+            'Unaccompanied child (yes/no)': family.hasUnaccompaniedChild ? 'Yes' : '',
+            'Pregnancy/breastfeeding (yes/no)': memberIndex === 0 ? (family.isPregnant ? 'حامل' : '') + (family.isBreastfeeding ? ' مرضع' : '') : '',
+            'Diabet': member.chronicIllnesses.diabetes ? 'Yes' : '',
+            'Hypertens': member.chronicIllnesses.hypertension ? 'Yes' : '',
+            'Heart disea': member.chronicIllnesses.heartDisease ? 'Yes' : '',
+            'Chronic illness (yes/no)': member.hasChronicIllness ? 'Yes' : '',
+            'Asthm': member.chronicIllnesses.asthma ? 'Yes' : '',
+            'Cancer': member.chronicIllnesses.cancer ? 'Yes' : '',
+            'Chronic kidney disea': member.chronicIllnesses.kidneyDisease ? 'Yes' : '',
+            'HIV/AID': member.chronicIllnesses.hiv ? 'Yes' : '',
+            'Arthrit': member.chronicIllnesses.arthritis ? 'Yes' : '',
+            'Physic': member.disabilities.physical ? 'Yes' : '',
+            'Vision Lo': member.disabilities.visual ? 'Yes' : '',
+            'Disabilities (yes/no)': member.hasDisabilities ? 'Yes' : '',
+            'Hearing Lo': member.disabilities.hearing ? 'Yes' : '',
+            'Intellect': member.disabilities.intellectual ? 'Yes' : '',
+            'Mental/psychosoc': member.disabilities.mentalPsychological ? 'Yes' : '',
+            'UXO Victim (yes/no)': member.isUXOVictim ? 'Yes' : '',
+            'Employment/Income': member.hasStableIncome ? 'Yes' : '',
+            'Calculated Field': '',
+            'Age': member.age.toString()
+          });
+        });
       });
+
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(exportData);
       
       // تحسين عرض الأعمدة
       const colWidths = [
-        { wch: 18 }, // اسم الزوج
-        { wch: 15 }, // رقم هوية الزوج
-        { wch: 15 }, // تاريخ ميلاد الزوج
-        { wch: 18 }, // اسم الزوجة
-        { wch: 15 }, // رقم هوية الزوجة
-        { wch: 15 }, // تاريخ ميلاد الزوجة
-        { wch: 8 },  // حامل
-        { wch: 8 },  // مرضع
-        { wch: 15 }, // رقم الجوال الأساسي
-        { wch: 15 }, // رقم الجوال البديل
-        { wch: 12 }, // عدد أفراد العائلة
-        { wch: 35 }, // أفراد العائلة
-        { wch: 10 }, // يوجد أمراض
-        { wch: 25 }, // تفاصيل الأمراض
-        { wch: 10 }, // يوجد إعاقات
-        { wch: 25 }, // أنواع الإعاقات
-        { wch: 10 }, // إصابات حرب
-        { wch: 15 }, // أطفال أقل من سنتين
-        { wch: 15 }, // أطفال 2-5 سنوات
-        { wch: 15 }, // تاريخ الإضافة
-        { wch: 15 }  // تاريخ التحديث
+        { wch: 12 }, // Entry Date
+        { wch: 20 }, // Enumerator Nam
+        { wch: 20 }, // HH Head
+        { wch: 25 }, // Full Name
+        { wch: 12 }, // National ID
+        { wch: 12 }, // Date of Birth
+        { wch: 8 },  // Gender
+        { wch: 12 }, // Contact Num
+        { wch: 12 }, // Marital Stat
+        { wch: 15 }, // Relation to HH Head
+        { wch: 15 }, // Unaccompanied child
+        { wch: 20 }, // Pregnancy/breastfeeding
+        { wch: 8 },  // Diabet
+        { wch: 10 }, // Hypertens
+        { wch: 10 }, // Heart disea
+        { wch: 15 }, // Chronic illness
+        { wch: 8 },  // Asthm
+        { wch: 8 },  // Cancer
+        { wch: 15 }, // Chronic kidney disea
+        { wch: 8 },  // HIV/AID
+        { wch: 8 },  // Arthrit
+        { wch: 8 },  // Physic
+        { wch: 10 }, // Vision Lo
+        { wch: 15 }, // Disabilities
+        { wch: 10 }, // Hearing Lo
+        { wch: 10 }, // Intellect
+        { wch: 15 }, // Mental/psychosoc
+        { wch: 15 }, // UXO Victim
+        { wch: 15 }, // Employment/Income
+        { wch: 10 }, // Calculated Field
+        { wch: 5 }   // Age
       ];
       ws['!cols'] = colWidths;
 
-      XLSX.utils.book_append_sheet(wb, ws, 'البيانات العائلية');
+      XLSX.utils.book_append_sheet(wb, ws, 'IDPs detailed list');
       
-      // تصدير الملف
-      const fileName = `البيانات_العائلية_${new Date().toISOString().split('T')[0]}.xlsx`;
-      console.log('اسم الملف:', fileName);
-      
+      const fileName = `IDPs_detailed_list_${new Date().toISOString().split('T')[0]}.xlsx`;
       XLSX.writeFile(wb, fileName);
-      console.log('تم تصدير الملف بنجاح');
       
     } catch (error) {
       console.error('Error exporting to Excel:', error);
