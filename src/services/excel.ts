@@ -2,6 +2,117 @@ import * as XLSX from 'xlsx';
 import { FamilyData } from '@/types/family';
 
 export class ExcelService {
+  static importFamiliesFromExcel(file: File): Promise<FamilyData[]> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      
+      reader.onload = (e) => {
+        try {
+          const data = e.target?.result;
+          const workbook = XLSX.read(data, { type: 'binary' });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          
+          // تحويل البيانات إلى JSON
+          const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+          
+          if (rawData.length < 2) {
+            throw new Error('الملف فارغ أو لا يحتوي على بيانات صحيحة');
+          }
+          
+          // تجاهل الصف الأول (العناوين) والبدء من الصف الثاني
+          const dataRows = rawData.slice(1) as any[];
+          
+          const importedFamilies: FamilyData[] = dataRows
+            .filter(row => row.length > 0 && row[0]) // التأكد من وجود بيانات في الصف
+            .map((row, index) => {
+              try {
+                // تحليل بيانات أفراد العائلة
+                const membersText = row[11] || '';
+                const members: any[] = [];
+                
+                if (membersText && typeof membersText === 'string') {
+                  const memberLines = membersText.split('\n').filter(line => line.trim());
+                  memberLines.forEach(line => {
+                    const nameMatch = line.match(/\d+\.\s*(.+?)\s*\((.+?)\)/);
+                    const birthMatch = line.match(/تاريخ الميلاد:\s*(.+)/);
+                    const healthMatch = line.match(/الحالة الصحية:\s*(.+)/);
+                    
+                    if (nameMatch) {
+                      const member = {
+                        id: `member-${Date.now()}-${Math.random()}`,
+                        fullName: nameMatch[1].trim(),
+                        relationship: nameMatch[2].trim(),
+                        birthDate: birthMatch ? birthMatch[1].trim() : '',
+                        healthStatus: healthMatch ? healthMatch[1].trim() : ''
+                      };
+                      members.push(member);
+                    }
+                  });
+                }
+                
+                // تحليل أنواع الإعاقات
+                const disabilityTypesText = row[15] || '';
+                const disabilityTypes = {
+                  بصرية: disabilityTypesText.includes('بصرية'),
+                  سمعية: disabilityTypesText.includes('سمعية'),
+                  حركية: disabilityTypesText.includes('حركية'),
+                  ذهنية: disabilityTypesText.includes('ذهنية'),
+                  نفسية: disabilityTypesText.includes('نفسية'),
+                  التوحد: disabilityTypesText.includes('التوحد'),
+                  متعددة: disabilityTypesText.includes('متعددة'),
+                  أخرى: disabilityTypesText.includes('أخرى')
+                };
+                
+                const family: FamilyData = {
+                  id: `family-${Date.now()}-${index}`,
+                  husbandName: row[0] || '',
+                  husbandId: row[1] || '',
+                  husbandBirthDate: row[2] || '',
+                  wifeName: row[3] || '',
+                  wifeId: row[4] || '',
+                  wifeBirthDate: row[5] || '',
+                  isPregnant: row[6] === 'نعم',
+                  isBreastfeeding: row[7] === 'نعم',
+                  phoneNumber: row[8] || '',
+                  alternativePhoneNumber: row[9] === 'غير محدد' ? '' : row[9] || '',
+                  familySize: parseInt(row[10]) || members.length,
+                  members: members,
+                  hasDiseases: row[12] === 'نعم',
+                  diseaseDetails: row[13] || '',
+                  hasDisabilities: row[14] === 'نعم',
+                  disabilityTypes: disabilityTypes,
+                  hasWarInjuries: row[16] === 'نعم',
+                  hasChildrenUnder2: row[17] === 'نعم',
+                  hasChildren2to5: row[18] === 'نعم',
+                  createdAt: new Date(),
+                  updatedAt: new Date()
+                };
+                
+                return family;
+              } catch (error) {
+                console.error(`خطأ في معالجة الصف ${index + 2}:`, error);
+                throw new Error(`خطأ في الصف ${index + 2}: بيانات غير صحيحة`);
+              }
+            });
+          
+          console.log('تم استيراد العائلات:', importedFamilies);
+          resolve(importedFamilies);
+          
+        } catch (error) {
+          console.error('Error importing Excel:', error);
+          reject(new Error('فشل في قراءة ملف Excel. تأكد من صحة تنسيق الملف.'));
+        }
+      };
+      
+      reader.onerror = () => {
+        reject(new Error('فشل في قراءة الملف'));
+      };
+      
+      reader.readAsBinaryString(file);
+    });
+  }
+
   static exportFamiliesToExcel(families: FamilyData[]): void {
     try {
       console.log('عدد العائلات للتصدير:', families.length);

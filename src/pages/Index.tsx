@@ -101,6 +101,64 @@ const Index = () => {
     }
   };
 
+  const handleImport = async (file: File) => {
+    try {
+      toast({
+        title: 'جاري الاستيراد...',
+        description: 'يتم الآن معالجة ملف Excel وإضافة البيانات',
+      });
+
+      const importedFamilies = await ExcelService.importFamiliesFromExcel(file);
+      
+      if (importedFamilies.length === 0) {
+        toast({
+          title: 'لا توجد بيانات للاستيراد',
+          description: 'الملف فارغ أو لا يحتوي على بيانات صحيحة',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      // حفظ العائلات المستوردة
+      let successCount = 0;
+      let errorCount = 0;
+      
+      importedFamilies.forEach(family => {
+        try {
+          FamilyStorageService.saveFamily(family);
+          successCount++;
+        } catch (error) {
+          errorCount++;
+          console.error('خطأ في حفظ العائلة:', error);
+        }
+      });
+
+      // تحديث البيانات المعروضة
+      loadFamilies();
+
+      if (successCount > 0) {
+        toast({
+          title: 'تم الاستيراد بنجاح',
+          description: `تم استيراد ${successCount} عائلة من ملف Excel${errorCount > 0 ? ` (فشل في استيراد ${errorCount})` : ''}`,
+        });
+      } else {
+        toast({
+          title: 'فشل في الاستيراد',
+          description: 'لم يتم استيراد أي عائلة بنجاح',
+          variant: 'destructive'
+        });
+      }
+
+    } catch (error) {
+      console.error('خطأ في الاستيراد:', error);
+      toast({
+        title: 'خطأ في الاستيراد',
+        description: error instanceof Error ? error.message : 'حدث خطأ أثناء استيراد البيانات',
+        variant: 'destructive'
+      });
+    }
+  };
+
   const handleHelp = () => {
     setShowHelp(true);
   };
@@ -151,6 +209,7 @@ const Index = () => {
       <Header
         onAddNew={handleAddNew}
         onExport={handleExport}
+        onImport={handleImport}
         onHelp={handleHelp}
         familyCount={families.length}
       />

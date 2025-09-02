@@ -1,15 +1,32 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { Plus, FileSpreadsheet, HelpCircle, Database } from 'lucide-react';
+import { Plus, FileSpreadsheet, HelpCircle, Database, Upload, Users } from 'lucide-react';
 
 interface HeaderProps {
   onAddNew: () => void;
   onExport: () => void;
+  onImport: (file: File) => void;
   onHelp: () => void;
   familyCount: number;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onAddNew, onExport, onHelp, familyCount }) => {
+export const Header: React.FC<HeaderProps> = ({ onAddNew, onExport, onImport, onHelp, familyCount }) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      onImport(file);
+      // إعادة تعيين قيمة input لتمكين اختيار نفس الملف مرة أخرى
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
   return (
     <header className="bg-gradient-hero shadow-elegant">
       <div className="container mx-auto px-4 py-6">
@@ -52,6 +69,24 @@ export const Header: React.FC<HeaderProps> = ({ onAddNew, onExport, onHelp, fami
             <FileSpreadsheet className="ml-2 h-5 w-5" />
             تصدير إلى Excel
           </Button>
+
+          <Button 
+            onClick={handleImportClick}
+            variant="outline"
+            className="bg-white/10 hover:bg-white/20 text-white border-white/40 hover:border-white/60 backdrop-blur-sm transition-all duration-300"
+            size="lg"
+          >
+            <Upload className="ml-2 h-5 w-5" />
+            استيراد من Excel
+          </Button>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            onChange={handleFileChange}
+            className="hidden"
+          />
           
           <Button 
             onClick={onHelp}
@@ -77,6 +112,3 @@ export const Header: React.FC<HeaderProps> = ({ onAddNew, onExport, onHelp, fami
     </header>
   );
 };
-
-// Import missing icon
-import { Users } from 'lucide-react';
