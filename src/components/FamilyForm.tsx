@@ -519,26 +519,102 @@ export const FamilyForm: React.FC<FamilyFormProps> = ({
 
                     {form.watch(`members.${index}.hasChronicIllness`) && (
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 p-4 bg-muted/50 rounded-lg">
-                        {Object.entries({
-                          diabetes: 'سكري',
-                          hypertension: 'ضغط',
-                          heartDisease: 'أمراض قلب',
-                          asthma: 'أزمة',
-                          cancer: 'سرطان',
-                          kidneyDisease: 'أمراض كلى',
-                          hiv: 'إيدز',
-                          arthritis: 'التهاب مفاصل'
-                        }).map(([key, label]) => (
-                          <div key={key} className="flex items-center space-x-2">
-                            <Checkbox
-                              checked={form.watch(`members.${index}.chronicIllnesses.${key}`) || false}
-                              onCheckedChange={(checked) => 
-                                form.setValue(`members.${index}.chronicIllnesses.${key}`, checked)
-                              }
-                            />
-                            <label className="text-sm cursor-pointer">{label}</label>
-                          </div>
-                        ))}
+                        <FormField
+                          control={form.control}
+                          name={`members.${index}.chronicIllnesses.diabetes`}
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                              <FormControl>
+                                <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                              </FormControl>
+                              <FormLabel className="text-sm cursor-pointer">سكري</FormLabel>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`members.${index}.chronicIllnesses.hypertension`}
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                              <FormControl>
+                                <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                              </FormControl>
+                              <FormLabel className="text-sm cursor-pointer">ضغط</FormLabel>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`members.${index}.chronicIllnesses.heartDisease`}
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                              <FormControl>
+                                <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                              </FormControl>
+                              <FormLabel className="text-sm cursor-pointer">أمراض قلب</FormLabel>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`members.${index}.chronicIllnesses.asthma`}
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                              <FormControl>
+                                <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                              </FormControl>
+                              <FormLabel className="text-sm cursor-pointer">أزمة</FormLabel>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`members.${index}.chronicIllnesses.cancer`}
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                              <FormControl>
+                                <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                              </FormControl>
+                              <FormLabel className="text-sm cursor-pointer">سرطان</FormLabel>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`members.${index}.chronicIllnesses.kidneyDisease`}
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                              <FormControl>
+                                <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                              </FormControl>
+                              <FormLabel className="text-sm cursor-pointer">أمراض كلى</FormLabel>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`members.${index}.chronicIllnesses.hiv`}
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                              <FormControl>
+                                <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                              </FormControl>
+                              <FormLabel className="text-sm cursor-pointer">إيدز</FormLabel>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`members.${index}.chronicIllnesses.arthritis`}
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                              <FormControl>
+                                <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                              </FormControl>
+                              <FormLabel className="text-sm cursor-pointer">التهاب مفاصل</FormLabel>
+                            </FormItem>
+                          )}
+                        />
                       </div>
                     )}
                   </div>
