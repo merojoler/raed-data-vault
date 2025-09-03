@@ -565,23 +565,81 @@ export const FamilyForm: React.FC<FamilyFormProps> = ({
 
                     {form.watch(`members.${index}.hasDisabilities`) && (
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-2 p-4 bg-muted/50 rounded-lg">
-                        {Object.entries({
-                          physical: 'إعاقة حركية',
-                          visual: 'إعاقة بصرية',
-                          hearing: 'إعاقة سمعية',
-                          intellectual: 'إعاقة ذهنية',
-                          mentalPsychological: 'إعاقة عقلية - نفسية'
-                        }).map(([key, label]) => (
-                          <div key={key} className="flex items-center space-x-2">
-                            <Checkbox
-                              checked={form.watch(`members.${index}.disabilities.${key}`) || false}
-                              onCheckedChange={(checked) => 
-                                form.setValue(`members.${index}.disabilities.${key}`, checked)
-                              }
-                            />
-                            <label className="text-sm cursor-pointer">{label}</label>
-                          </div>
-                        ))}
+                        <FormField
+                          control={form.control}
+                          name={`members.${index}.disabilities.physical`}
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                              <FormLabel className="text-sm cursor-pointer">إعاقة حركية</FormLabel>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`members.${index}.disabilities.visual`}
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                              <FormLabel className="text-sm cursor-pointer">إعاقة بصرية</FormLabel>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`members.${index}.disabilities.hearing`}
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                              <FormLabel className="text-sm cursor-pointer">إعاقة سمعية</FormLabel>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`members.${index}.disabilities.intellectual`}
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                              <FormLabel className="text-sm cursor-pointer">إعاقة ذهنية</FormLabel>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`members.${index}.disabilities.mentalPsychological`}
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                              <FormLabel className="text-sm cursor-pointer">إعاقة عقلية - نفسية</FormLabel>
+                            </FormItem>
+                          )}
+                        />
                       </div>
                     )}
                   </div>
