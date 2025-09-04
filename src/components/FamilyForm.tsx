@@ -61,10 +61,6 @@ const familyMemberSchema = z.object({
 });
 
 const familySchema = z.object({
-  headOfHouseholdName: z.string().min(1, 'اسم رب الأسرة مطلوب'),
-  headOfHouseholdId: z.string().regex(/^\d{9}$/, 'رقم الهوية يجب أن يكون 9 أرقام'),
-  contactNumber: z.string().regex(/^\d{10}$/, 'رقم الاتصال يجب أن يكون 10 أرقام'),
-  
   members: z.array(familyMemberSchema).min(1, 'يجب إضافة فرد واحد على الأقل'),
   
   isPregnant: z.boolean(),
@@ -107,9 +103,6 @@ export const FamilyForm: React.FC<FamilyFormProps> = ({
   const form = useForm<FamilyFormData>({
     resolver: zodResolver(familySchema),
     defaultValues: {
-      headOfHouseholdName: existingFamily?.headOfHouseholdName || '',
-      headOfHouseholdId: existingFamily?.headOfHouseholdId || '',
-      contactNumber: existingFamily?.contactNumber || '',
       members: existingFamily?.members?.map(member => ({
         fullName: member.fullName,
         identityNumber: member.identityNumber,
@@ -172,12 +165,15 @@ export const FamilyForm: React.FC<FamilyFormProps> = ({
     try {
       const today = new Date().toISOString().split('T')[0];
       
+      // استخراج معلومات رب الأسرة من العضو الأول
+      const headOfHousehold = data.members.find(m => m.relationship === 'Head') || data.members[0];
+      
       const familyData: FamilyData = {
         id: existingFamily?.id || crypto.randomUUID(),
         entryDate: existingFamily?.entryDate || today,
-        headOfHouseholdName: data.headOfHouseholdName,
-        headOfHouseholdId: data.headOfHouseholdId,
-        contactNumber: data.contactNumber,
+        headOfHouseholdName: headOfHousehold.fullName,
+        headOfHouseholdId: headOfHousehold.identityNumber,
+        contactNumber: existingFamily?.contactNumber || '0000000000', // رقم افتراضي أو يمكن جعل هذا الحقل في أفراد العائلة
         members: data.members.map(member => ({
           id: crypto.randomUUID(),
           fullName: member.fullName,
@@ -285,60 +281,6 @@ export const FamilyForm: React.FC<FamilyFormProps> = ({
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
           
-          {/* معلومات أساسية */}
-          <Card className="shadow-card border-primary/20">
-            <CardHeader className="bg-gradient-primary text-white">
-              <CardTitle className="flex items-center gap-2">
-                <Crown className="h-5 w-5" />
-                معلومات رب الأسرة
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-6 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <FormField
-                  control={form.control}
-                  name="headOfHouseholdName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-base font-medium">اسم رب الأسرة *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="الاسم الكامل" className="text-right" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="headOfHouseholdId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-base font-medium">رقم هوية رب الأسرة *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="9 أرقام" className="text-right" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="contactNumber"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-base font-medium">رقم التواصل *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="0591234567" className="text-right" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </CardContent>
-          </Card>
 
           {/* أفراد العائلة */}
           <Card className="shadow-card border-primary/20">
