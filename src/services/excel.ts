@@ -141,6 +141,8 @@ export class ExcelService {
             'National ID': member.identityNumber,
             'Date of Birth': new Date(member.birthDate).toLocaleDateString('en-CA'),
             'Gender (F/M)': member.gender,
+            'Phone Number': member.phoneNumber || '',
+            'Alternative Phone': member.alternativePhoneNumber || '',
             'Contact Num': memberIndex === 0 ? family.contactNumber : '',
             'Marital Stat': member.maritalStatus,
             'Relation to HH Head': relationshipNames[member.relationship] || member.relationship,
@@ -181,6 +183,8 @@ export class ExcelService {
         { wch: 12 }, // National ID
         { wch: 12 }, // Date of Birth
         { wch: 8 },  // Gender
+        { wch: 15 }, // Phone Number
+        { wch: 15 }, // Alternative Phone
         { wch: 12 }, // Contact Num
         { wch: 12 }, // Marital Stat
         { wch: 15 }, // Relation to HH Head

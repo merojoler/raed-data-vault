@@ -33,6 +33,10 @@ const familyMemberSchema = z.object({
   relationship: z.enum(['Head', 'Spouse', 'Son', 'Daughter']),
   maritalStatus: z.enum(maritalStatusOptions),
   
+  // معلومات التواصل
+  phoneNumber: z.string().min(1, 'رقم الهاتف مطلوب').regex(/^[0-9+\-\s()]+$/, 'رقم هاتف غير صحيح'),
+  alternativePhoneNumber: z.string().optional(),
+  
   // الأمراض المزمنة
   hasChronicIllness: z.boolean(),
   chronicIllnesses: z.object({
@@ -110,6 +114,8 @@ export const FamilyForm: React.FC<FamilyFormProps> = ({
         gender: member.gender,
         relationship: member.relationship,
         maritalStatus: member.maritalStatus,
+        phoneNumber: member.phoneNumber || '',
+        alternativePhoneNumber: member.alternativePhoneNumber || '',
         hasChronicIllness: member.hasChronicIllness,
         chronicIllnesses: member.chronicIllnesses,
         hasDisabilities: member.hasDisabilities,
@@ -123,6 +129,8 @@ export const FamilyForm: React.FC<FamilyFormProps> = ({
         gender: 'M' as const,
         relationship: 'Head' as const,
         maritalStatus: 'متزوج' as const,
+        phoneNumber: '',
+        alternativePhoneNumber: '',
         hasChronicIllness: false,
         chronicIllnesses: {
           diabetes: false,
@@ -173,7 +181,7 @@ export const FamilyForm: React.FC<FamilyFormProps> = ({
         entryDate: existingFamily?.entryDate || today,
         headOfHouseholdName: headOfHousehold.fullName,
         headOfHouseholdId: headOfHousehold.identityNumber,
-        contactNumber: existingFamily?.contactNumber || '0000000000', // رقم افتراضي أو يمكن جعل هذا الحقل في أفراد العائلة
+        contactNumber: headOfHousehold.phoneNumber || '0000000000', // استخراج رقم هاتف رب الأسرة
         members: data.members.map(member => ({
           id: crypto.randomUUID(),
           fullName: member.fullName,
@@ -183,6 +191,8 @@ export const FamilyForm: React.FC<FamilyFormProps> = ({
           gender: member.gender,
           relationship: member.relationship,
           maritalStatus: member.maritalStatus,
+          phoneNumber: member.phoneNumber,
+          alternativePhoneNumber: member.alternativePhoneNumber,
           hasChronicIllness: member.hasChronicIllness,
           chronicIllnesses: {
             diabetes: member.chronicIllnesses.diabetes || false,
@@ -243,6 +253,8 @@ export const FamilyForm: React.FC<FamilyFormProps> = ({
       gender: 'M',
       relationship: 'Son',
       maritalStatus: 'أعزب',
+      phoneNumber: '',
+      alternativePhoneNumber: '',
       hasChronicIllness: false,
       chronicIllnesses: {
         diabetes: false,
@@ -362,6 +374,40 @@ export const FamilyForm: React.FC<FamilyFormProps> = ({
                           <FormLabel>تاريخ الميلاد *</FormLabel>
                           <FormControl>
                             <Input type="date" className="text-right" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name={`members.${index}.phoneNumber`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="flex items-center gap-1">
+                            <Phone className="h-3 w-3" />
+                            رقم الهاتف *
+                          </FormLabel>
+                          <FormControl>
+                            <Input placeholder="رقم الهاتف" className="text-right" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name={`members.${index}.alternativePhoneNumber`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="flex items-center gap-1">
+                            <Phone className="h-3 w-3" />
+                            رقم الهاتف البديل
+                          </FormLabel>
+                          <FormControl>
+                            <Input placeholder="رقم الهاتف البديل (اختياري)" className="text-right" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>

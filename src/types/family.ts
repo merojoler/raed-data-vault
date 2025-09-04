@@ -8,6 +8,10 @@ export interface FamilyMember {
   relationship: 'Head' | 'Spouse' | 'Son' | 'Daughter';
   maritalStatus: 'متزوج' | 'أعزب' | 'أرمل' | 'مطلق' | 'مهجور';
   
+  // معلومات التواصل
+  phoneNumber?: string;
+  alternativePhoneNumber?: string;
+  
   // الحالة الصحية والإعاقات
   hasChronicIllness: boolean;
   chronicIllnesses: {
