@@ -16,7 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 
 const relationshipOptions = [
   { value: 'Head', label: 'رب الأسرة', color: 'text-yellow-600' },
-  { value: 'Spouse', label: 'زوج/زوجة', color: 'text-pink-600' },
+  { value: 'Spouse', label: 'زوجة', color: 'text-pink-600' },
   { value: 'Son', label: 'ابن', color: 'text-blue-600' },
   { value: 'Daughter', label: 'ابنة', color: 'text-purple-600' }
 ] as const;
@@ -33,8 +33,8 @@ const familyMemberSchema = z.object({
   relationship: z.enum(['Head', 'Spouse', 'Son', 'Daughter']),
   maritalStatus: z.enum(maritalStatusOptions),
   
-  // معلومات التواصل
-  phoneNumber: z.string().min(1, 'رقم الهاتف مطلوب').regex(/^[0-9+\-\s()]+$/, 'رقم هاتف غير صحيح'),
+  // معلومات التواصل - رقم الهاتف مطلوب لرب الأسرة فقط
+  phoneNumber: z.string().optional(),
   alternativePhoneNumber: z.string().optional(),
   
   // الأمراض المزمنة
@@ -62,6 +62,15 @@ const familyMemberSchema = z.object({
   
   isUXOVictim: z.boolean(),
   hasStableIncome: z.boolean()
+}).refine((data) => {
+  // التحقق من أن رب الأسرة لديه رقم هاتف
+  if (data.relationship === 'Head') {
+    return data.phoneNumber && data.phoneNumber.trim().length > 0;
+  }
+  return true;
+}, {
+  message: 'رقم الهاتف مطلوب لرب الأسرة',
+  path: ['phoneNumber']
 });
 
 const familySchema = z.object({
@@ -379,24 +388,31 @@ export const FamilyForm: React.FC<FamilyFormProps> = ({
                         </FormItem>
                       )}
                     />
+                  </div>
 
-                    <FormField
-                      control={form.control}
-                      name={`members.${index}.phoneNumber`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="flex items-center gap-1">
-                            <Phone className="h-3 w-3" />
-                            رقم الهاتف *
-                          </FormLabel>
-                          <FormControl>
-                            <Input placeholder="رقم الهاتف" className="text-right" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
+                  {/* معلومات التواصل */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* رقم الهاتف - يظهر للأب فقط */}
+                    {form.watch(`members.${index}.relationship`) === 'Head' && (
+                      <FormField
+                        control={form.control}
+                        name={`members.${index}.phoneNumber`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="flex items-center gap-1">
+                              <Phone className="h-3 w-3" />
+                              رقم الهاتف *
+                            </FormLabel>
+                            <FormControl>
+                              <Input placeholder="رقم الهاتف" className="text-right" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
+                    
+                    {/* رقم الهاتف البديل - يظهر للجميع */}
                     <FormField
                       control={form.control}
                       name={`members.${index}.alternativePhoneNumber`}
@@ -404,16 +420,23 @@ export const FamilyForm: React.FC<FamilyFormProps> = ({
                         <FormItem>
                           <FormLabel className="flex items-center gap-1">
                             <Phone className="h-3 w-3" />
-                            رقم الهاتف البديل
+                            {form.watch(`members.${index}.relationship`) === 'Head' ? 'رقم الهاتف البديل' : 'رقم الهاتف'}
+                            {form.watch(`members.${index}.relationship`) !== 'Head' && ' (اختياري)'}
                           </FormLabel>
                           <FormControl>
-                            <Input placeholder="رقم الهاتف البديل (اختياري)" className="text-right" {...field} />
+                            <Input 
+                              placeholder={`أدخل ${form.watch(`members.${index}.relationship`) === 'Head' ? 'رقم الهاتف البديل' : 'رقم الهاتف'}`} 
+                              className="text-right" 
+                              {...field} 
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
+                  </div>
 
+                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     <FormField
                       control={form.control}
                       name={`members.${index}.gender`}
