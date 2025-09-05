@@ -26,45 +26,155 @@ export class ExcelService {
           const sheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[sheetName];
           
-          const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+          const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
           
-          if (rawData.length < 2) {
+          if (jsonData.length < 2) {
             throw new Error('الملف فارغ أو لا يحتوي على بيانات صحيحة');
           }
-          
-          const dataRows = rawData.slice(1) as any[];
-          
-          const importedFamilies: FamilyData[] = dataRows
-            .filter(row => row.length > 0 && row[0])
-            .map((row, index) => {
-              try {
+
+          // استخراج العناوين من الصف الأول
+          const headers = jsonData[0] as string[];
+          const dataRows = jsonData.slice(1) as any[][];
+
+          // تجميع البيانات حسب العائلات
+          const familiesMap = new Map<string, any>();
+
+          dataRows.forEach((row, rowIndex) => {
+            try {
+              if (!row || row.length === 0 || !row[3]) return; // تخطي الصفوف الفارغة
+
+              const fullName = row[3] || ''; // Full Name
+              const relation = row[11] || ''; // Relation to HH Head
+              const hhHead = row[2] || ''; // HH Head
+              
+              // تحديد معرف العائلة
+              const familyId = hhHead || fullName;
+              
+              if (!familiesMap.has(familyId)) {
+                // إنشاء عائلة جديدة
                 const today = new Date().toISOString().split('T')[0];
                 
-                const family: FamilyData = {
-                  id: `family-${Date.now()}-${index}`,
-                  entryDate: today,
-                  headOfHouseholdName: row[2] || '',
-                  headOfHouseholdId: row[3] || '',
-                  contactNumber: row[4] || '',
-                  members: [], // سيتم ملؤها لاحقاً
-                  isPregnant: row[5] === 'نعم' || row[5] === 'Yes',
-                  isBreastfeeding: row[6] === 'نعم' || row[6] === 'Yes',
-                  hasUnaccompaniedChild: row[7] === 'نعم' || row[7] === 'Yes',
-                  unaccompaniedChildDetails: row[7] === 'نعم' || row[7] === 'Yes' ? {
-                    name: row[8] || '',
-                    details: row[9] || ''
-                  } : undefined,
+                familiesMap.set(familyId, {
+                  id: `family-${Date.now()}-${rowIndex}`,
+                  entryDate: row[0] || today, // Entry Date
+                  headOfHouseholdName: hhHead || fullName,
+                  headOfHouseholdId: '',
+                  contactNumber: row[9] || '', // Contact Number
+                  members: [],
+                  isPregnant: false,
+                  isBreastfeeding: false,
+                  hasUnaccompaniedChild: (row[12] || '').includes('Yes') || (row[12] || '').includes('نعم'),
+                  unaccompaniedChildDetails: undefined,
                   createdAt: new Date(),
                   updatedAt: new Date()
-                };
-                
-                return family;
-              } catch (error) {
-                console.error(`خطأ في معالجة الصف ${index + 2}:`, error);
-                throw new Error(`خطأ في الصف ${index + 2}: بيانات غير صحيحة`);
+                });
               }
+
+              const family = familiesMap.get(familyId);
+              
+              // إنشاء عضو العائلة
+              const birthDateStr = row[5] || ''; // Date of Birth
+              let birthDate = new Date();
+              
+              if (birthDateStr) {
+                const parsedDate = new Date(birthDateStr);
+                if (!isNaN(parsedDate.getTime())) {
+                  birthDate = parsedDate;
+                }
+              }
+
+              const age = row[32] ? parseInt(row[32]) : calculateAge(birthDate.toISOString().split('T')[0]);
+
+              // تحديد صلة القرابة
+              let relationship: 'Head' | 'Spouse' | 'Son' | 'Daughter' = 'Head';
+              const relationStr = (relation || '').toLowerCase();
+              if (relationStr.includes('زوج') || relationStr.includes('wife') || relationStr.includes('spouse')) {
+                relationship = 'Spouse';
+              } else if (relationStr.includes('ابن') || relationStr.includes('son')) {
+                relationship = 'Son';
+              } else if (relationStr.includes('ابنة') || relationStr.includes('daughter')) {
+                relationship = 'Daughter';
+              }
+
+              const member: FamilyMember = {
+                id: `member-${Date.now()}-${rowIndex}`,
+                fullName: fullName,
+                identityNumber: row[4] || '', // National ID
+                birthDate: birthDate.toISOString().split('T')[0],
+                age: age,
+                gender: row[6] === 'F' || row[6] === 'أ' ? 'F' : 'M', // Gender
+                phoneNumber: relationship === 'Head' ? (row[7] || '') : '', // Phone Number للرب فقط
+                alternativePhoneNumber: relationship !== 'Head' ? (row[8] || '') : '', // Alternative Phone للآخرين
+                maritalStatus: row[10] || 'Single', // Marital Status
+                relationship: relationship,
+                hasChronicIllness: 
+                  (row[14] || '').includes('Yes') || (row[14] || '').includes('نعم') ||
+                  (row[15] || '').includes('Yes') || (row[15] || '').includes('نعم') ||
+                  (row[16] || '').includes('Yes') || (row[16] || '').includes('نعم') ||
+                  (row[18] || '').includes('Yes') || (row[18] || '').includes('نعم') ||
+                  (row[19] || '').includes('Yes') || (row[19] || '').includes('نعم') ||
+                  (row[20] || '').includes('Yes') || (row[20] || '').includes('نعم') ||
+                  (row[21] || '').includes('Yes') || (row[21] || '').includes('نعم') ||
+                  (row[22] || '').includes('Yes') || (row[22] || '').includes('نعم'),
+                chronicIllnesses: {
+                  diabetes: (row[14] || '').includes('Yes') || (row[14] || '').includes('نعم'),
+                  hypertension: (row[15] || '').includes('Yes') || (row[15] || '').includes('نعم'),
+                  heartDisease: (row[16] || '').includes('Yes') || (row[16] || '').includes('نعم'),
+                  asthma: (row[18] || '').includes('Yes') || (row[18] || '').includes('نعم'),
+                  cancer: (row[19] || '').includes('Yes') || (row[19] || '').includes('نعم'),
+                  kidneyDisease: (row[20] || '').includes('Yes') || (row[20] || '').includes('نعم'),
+                  hiv: (row[21] || '').includes('Yes') || (row[21] || '').includes('نعم'),
+                  arthritis: (row[22] || '').includes('Yes') || (row[22] || '').includes('نعم')
+                },
+                hasDisabilities: 
+                  (row[23] || '').includes('Yes') || (row[23] || '').includes('نعم') ||
+                  (row[24] || '').includes('Yes') || (row[24] || '').includes('نعم') ||
+                  (row[26] || '').includes('Yes') || (row[26] || '').includes('نعم') ||
+                  (row[27] || '').includes('Yes') || (row[27] || '').includes('نعم') ||
+                  (row[28] || '').includes('Yes') || (row[28] || '').includes('نعم'),
+                disabilities: {
+                  physical: (row[23] || '').includes('Yes') || (row[23] || '').includes('نعم'),
+                  visual: (row[24] || '').includes('Yes') || (row[24] || '').includes('نعم'),
+                  hearing: (row[26] || '').includes('Yes') || (row[26] || '').includes('نعم'),
+                  intellectual: (row[27] || '').includes('Yes') || (row[27] || '').includes('نعم'),
+                  mentalPsychological: (row[28] || '').includes('Yes') || (row[28] || '').includes('نعم')
+                },
+                isUXOVictim: (row[29] || '').includes('Yes') || (row[29] || '').includes('نعم'),
+                hasStableIncome: (row[30] || '').includes('Yes') || (row[30] || '').includes('نعم')
+              };
+
+              family.members.push(member);
+
+              // تحديث معلومات العائلة حسب أعضائها
+              if (relationship === 'Head') {
+                family.headOfHouseholdId = member.identityNumber;
+                family.contactNumber = member.phoneNumber;
+              }
+
+              // تحديث حالة الحمل والرضاعة
+              const pregnancyInfo = row[13] || '';
+              if (pregnancyInfo.includes('حامل') || pregnancyInfo.includes('pregnant')) {
+                family.isPregnant = true;
+              }
+              if (pregnancyInfo.includes('مرضع') || pregnancyInfo.includes('breastfeeding')) {
+                family.isBreastfeeding = true;
+              }
+
+            } catch (error) {
+              console.error(`خطأ في معالجة الصف ${rowIndex + 2}:`, error);
+              // لا نرمي خطأ هنا، بل نتخطى الصف فقط
+            }
+          });
+
+          // ترتيب الأعضاء داخل كل عائلة
+          const importedFamilies = Array.from(familiesMap.values()).map(family => {
+            family.members.sort((a: FamilyMember, b: FamilyMember) => {
+              const order = { 'Head': 0, 'Spouse': 1, 'Son': 2, 'Daughter': 3 };
+              return order[a.relationship] - order[b.relationship];
             });
-          
+            return family;
+          });
+
           resolve(importedFamilies);
           
         } catch (error) {
