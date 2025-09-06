@@ -48,26 +48,28 @@ export class ExcelService {
               const hhHead = row[2] || ''; // HH Head
               const nationalId = row[4] || ''; // National ID
               
-              // تحديد معرف العائلة - نستخدم رب الأسرة كمعرف أساسي
-              // إذا كان الشخص رب الأسرة، نستخدم اسمه وهويته
-              // إذا لم يكن رب الأسرة، نستخدم اسم رب الأسرة المذكور في العمود
-              let familyId: string;
+              // تحديد معرف العائلة - نستخدم اسم رب الأسرة كمعرف أساسي لجميع الأعضاء
               const relationStr = (relation || '').toLowerCase();
               
+              // تحديد اسم رب الأسرة
+              let headOfFamilyName: string;
               if (relationStr.includes('head') || relationStr.includes('رب') || relation === '' || !hhHead) {
-                // هذا الشخص رب الأسرة
-                familyId = `${fullName}_${nationalId}`.replace(/\s+/g, '_');
+                // هذا الشخص هو رب الأسرة
+                headOfFamilyName = fullName;
               } else {
-                // هذا الشخص عضو في الأسرة - نستخدم اسم رب الأسرة
-                familyId = hhHead.replace(/\s+/g, '_');
+                // هذا عضو في الأسرة - رب الأسرة مذكور في العمود HH Head
+                headOfFamilyName = hhHead;
               }
+              
+              // استخدام اسم رب الأسرة كمعرف موحد لكل العائلة
+              const familyId = headOfFamilyName.replace(/\s+/g, '_');
               
               if (!familiesMap.has(familyId)) {
                 // إنشاء عائلة جديدة
                 const today = new Date().toISOString().split('T')[0];
                 
-                // تحديد اسم رب الأسرة
-                const headName = relationStr.includes('head') || relationStr.includes('رب') || relation === '' || !hhHead ? fullName : hhHead;
+                // تحديد اسم رب الأسرة للعائلة الجديدة
+                const headName = headOfFamilyName;
                 
                 familiesMap.set(familyId, {
                   id: `family-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
