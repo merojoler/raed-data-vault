@@ -46,20 +46,35 @@ export class ExcelService {
               const fullName = row[3] || ''; // Full Name
               const relation = row[11] || ''; // Relation to HH Head
               const hhHead = row[2] || ''; // HH Head
+              const nationalId = row[4] || ''; // National ID
               
-              // تحديد معرف العائلة
-              const familyId = hhHead || fullName;
+              // تحديد معرف العائلة - نستخدم رب الأسرة كمعرف أساسي
+              // إذا كان الشخص رب الأسرة، نستخدم اسمه وهويته
+              // إذا لم يكن رب الأسرة، نستخدم اسم رب الأسرة المذكور في العمود
+              let familyId: string;
+              const relationStr = (relation || '').toLowerCase();
+              
+              if (relationStr.includes('head') || relationStr.includes('رب') || relation === '' || !hhHead) {
+                // هذا الشخص رب الأسرة
+                familyId = `${fullName}_${nationalId}`.replace(/\s+/g, '_');
+              } else {
+                // هذا الشخص عضو في الأسرة - نستخدم اسم رب الأسرة
+                familyId = hhHead.replace(/\s+/g, '_');
+              }
               
               if (!familiesMap.has(familyId)) {
                 // إنشاء عائلة جديدة
                 const today = new Date().toISOString().split('T')[0];
                 
+                // تحديد اسم رب الأسرة
+                const headName = relationStr.includes('head') || relationStr.includes('رب') || relation === '' || !hhHead ? fullName : hhHead;
+                
                 familiesMap.set(familyId, {
-                  id: `family-${Date.now()}-${rowIndex}`,
+                  id: `family-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                   entryDate: row[0] || today, // Entry Date
-                  headOfHouseholdName: hhHead || fullName,
+                  headOfHouseholdName: headName,
                   headOfHouseholdId: '',
-                  contactNumber: row[9] || '', // Contact Number
+                  contactNumber: '', // سيتم تحديثه عند العثور على رب الأسرة
                   members: [],
                   isPregnant: false,
                   isBreastfeeding: false,
@@ -87,23 +102,23 @@ export class ExcelService {
 
               // تحديد صلة القرابة
               let relationship: 'Head' | 'Spouse' | 'Son' | 'Daughter' = 'Head';
-              const relationStr = (relation || '').toLowerCase();
-              if (relationStr.includes('زوج') || relationStr.includes('wife') || relationStr.includes('spouse')) {
+              const memberRelationStr = (relation || '').toLowerCase();
+              if (memberRelationStr.includes('زوج') || memberRelationStr.includes('wife') || memberRelationStr.includes('spouse')) {
                 relationship = 'Spouse';
-              } else if (relationStr.includes('ابن') || relationStr.includes('son')) {
+              } else if (memberRelationStr.includes('ابن') || memberRelationStr.includes('son')) {
                 relationship = 'Son';
-              } else if (relationStr.includes('ابنة') || relationStr.includes('daughter')) {
+              } else if (memberRelationStr.includes('ابنة') || memberRelationStr.includes('daughter')) {
                 relationship = 'Daughter';
               }
 
               const member: FamilyMember = {
-                id: `member-${Date.now()}-${rowIndex}`,
+                id: `member-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                 fullName: fullName,
-                identityNumber: row[4] || '', // National ID
+                identityNumber: nationalId,
                 birthDate: birthDate.toISOString().split('T')[0],
                 age: age,
                 gender: row[6] === 'F' || row[6] === 'أ' ? 'F' : 'M', // Gender
-                phoneNumber: relationship === 'Head' ? (row[7] || '') : '', // Phone Number للرب فقط
+                phoneNumber: relationship === 'Head' ? (row[7] || row[9] || '') : '', // Phone Number للرب فقط
                 alternativePhoneNumber: relationship !== 'Head' ? (row[8] || '') : '', // Alternative Phone للآخرين
                 maritalStatus: row[10] || 'Single', // Marital Status
                 relationship: relationship,
@@ -147,8 +162,9 @@ export class ExcelService {
 
               // تحديث معلومات العائلة حسب أعضائها
               if (relationship === 'Head') {
+                family.headOfHouseholdName = member.fullName;
                 family.headOfHouseholdId = member.identityNumber;
-                family.contactNumber = member.phoneNumber;
+                family.contactNumber = member.phoneNumber || row[9] || '';
               }
 
               // تحديث حالة الحمل والرضاعة
