@@ -36,49 +36,71 @@ export class ExcelService {
           const headers = jsonData[0] as string[];
           const dataRows = jsonData.slice(1) as any[][];
 
-          // تجميع البيانات حسب العائلات - مرحلة أولى: جمع البيانات (مع تعبئة تلقائية لاسم رب الأسرة لصفوف العائلة)
+          // تجميع البيانات حسب العائلات - استراتيجية محسنة للتجميع الصحيح
           const rawFamilyData = new Map<string, any[]>();
+          let currentFamilyKey = '';
           let currentHeadName = '';
           
-          // أولاً: تجميع جميع الصفوف حسب رب الأسرة
+          // مرحلة أولى: تحديد العائلات والمعرف الصحيح لكل عائلة
           dataRows.forEach((row, rowIndex) => {
             try {
               if (!row || row.length === 0 || !row[3]) return; // تخطي الصفوف الفارغة
 
-              const fullName = row[3] || ''; // Full Name
+              const fullName = (row[3] || '').trim(); // Full Name
               const relation = (row[11] || '').trim(); // Relation to HH Head
-              const hhHeadCell = (row[2] || '').trim(); // HH Head (قد تكون فارغة في الصفوف اللاحقة)
-              const nationalId = row[4] || ''; // National ID
+              const hhHeadCell = (row[2] || '').trim(); // HH Head
+              const enumeratorName = (row[1] || '').trim(); // Enumerator Name
+              const nationalId = (row[4] || '').trim(); // National ID
               
-              // تحديد اسم رب الأسرة بشكل موثوق مع تعبئة للأسفل
-              const relationStr = relation.toLowerCase();
-              if (relationStr.includes('head') || relationStr.includes('رب')) {
-                // هذا الصف لرب الأسرة
+              // إنشاء مفتاح موحد للعائلة بناءً على عدة عوامل
+              let familyIdentifier = '';
+              
+              // الطريقة الأولى: استخدام عمود رب الأسرة إذا كان مملوء
+              if (hhHeadCell) {
+                familyIdentifier = hhHeadCell;
+              }
+              // الطريقة الثانية: استخدام اسم العداد كمعرف للعائلة
+              else if (enumeratorName) {
+                familyIdentifier = enumeratorName;
+              }
+              // الطريقة الثالثة: إذا كان هذا الشخص رب الأسرة
+              else if (relation.toLowerCase().includes('head') || relation.toLowerCase().includes('رب') || relation === '') {
+                familyIdentifier = fullName;
                 currentHeadName = fullName;
-              } else if (hhHeadCell) {
-                // عضو والأسرة مذكورة في العمود
-                currentHeadName = hhHeadCell;
-              } else if (!currentHeadName) {
-                // في حال كان أول صف ولم يتم تحديد رب الأسرة بعد
+              }
+              // الطريقة الرابعة: استخدام رب الأسرة الحالي
+              else if (currentHeadName) {
+                familyIdentifier = currentHeadName;
+              }
+              // الطريقة الأخيرة: استخدام الاسم الكامل
+              else {
+                familyIdentifier = fullName;
                 currentHeadName = fullName;
               }
 
-              const familyHeadName = currentHeadName || fullName;
+              // تحديث رب الأسرة الحالي إذا وُجد رب أسرة جديد
+              if (relation.toLowerCase().includes('head') || relation.toLowerCase().includes('رب')) {
+                currentHeadName = fullName;
+                familyIdentifier = fullName;
+              }
               
-              // تنظيف اسم رب الأسرة كمعرف ثابت للتجميع
-              const familyKey = familyHeadName.replace(/\s+/g, '_').toLowerCase();
+              // إنشاء مفتاح ثابت للعائلة
+              const familyKey = familyIdentifier.replace(/\s+/g, '_').toLowerCase().replace(/[^\w\u0600-\u06FF]/g, '');
               
               if (!rawFamilyData.has(familyKey)) {
                 rawFamilyData.set(familyKey, []);
               }
               
+              // حفظ البيانات مع المعرف الصحيح للعائلة
               rawFamilyData.get(familyKey)!.push({
                 row,
                 fullName,
                 relation,
-                hhHead: hhHeadCell,
+                hhHead: hhHeadCell || familyIdentifier,
+                enumerator: enumeratorName || familyIdentifier,
                 nationalId,
-                familyHeadName
+                familyHeadName: familyIdentifier,
+                originalRowIndex: rowIndex
               });
               
             } catch (error) {
@@ -316,8 +338,8 @@ export class ExcelService {
           
           exportData.push({
             'Entry Date\nتاريخ الإدخال': family.entryDate,
-            'Enumerator Name\nاسم العداد': family.headOfHouseholdName,
-            'HH Head\nرب الأسرة': family.headOfHouseholdName,
+            'Enumerator Name\nاسم العداد': family.headOfHouseholdName, // نفس اسم رب الأسرة لجميع الأعضاء
+            'HH Head\nرب الأسرة': family.headOfHouseholdName, // نفس اسم رب الأسرة لجميع الأعضاء
             'Full Name\nالاسم الكامل': member.fullName,
             'National ID\nرقم الهوية': member.identityNumber,
             'Date of Birth\nتاريخ الولادة': new Date(member.birthDate).toLocaleDateString('en-CA'),
@@ -328,7 +350,7 @@ export class ExcelService {
             'Marital Status\nالحالة الاجتماعية': member.maritalStatus,
             'Relation to HH Head\nصلة القرابة برب الأسرة': relationshipNames[member.relationship] || member.relationship,
             'Unaccompanied child\nطفل غير مصحوب': family.hasUnaccompaniedChild ? 'Yes\nنعم' : '',
-            'Pregnancy/breastfeeding\nحمل/رضاعة': (family.isPregnant ? 'حامل' : '') + (family.isBreastfeeding ? ' مرضع' : ''),
+            'Pregnancy/breastfeeding\nحمل/رضاعة': (family.isPregnant ? 'حامل' : '') + (family.isBreastfeeding ? (family.isPregnant ? ' مرضع' : 'مرضع') : ''),
             'Diabetes\nسكري': member.chronicIllnesses.diabetes ? 'Yes\nنعم' : '',
             'Hypertension\nضغط الدم': member.chronicIllnesses.hypertension ? 'Yes\nنعم' : '',
             'Heart Disease\nأمراض القلب': member.chronicIllnesses.heartDisease ? 'Yes\nنعم' : '',
