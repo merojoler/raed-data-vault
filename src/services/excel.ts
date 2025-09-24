@@ -36,12 +36,10 @@ export class ExcelService {
           const headers = jsonData[0] as string[];
           const dataRows = jsonData.slice(1) as any[][];
 
-          // تجميع البيانات حسب العائلات - استراتيجية محسنة للتجميع الصحيح
+          // تجميع البيانات حسب العائلات - تجميع يعتمد فقط على "رب الأسرة" مع تعبئة للأسفل
           const rawFamilyData = new Map<string, any[]>();
-          let currentFamilyKey = '';
           let currentHeadName = '';
           
-          // مرحلة أولى: تحديد العائلات والمعرف الصحيح لكل عائلة
           dataRows.forEach((row, rowIndex) => {
             try {
               if (!row || row.length === 0 || !row[3]) return; // تخطي الصفوف الفارغة
@@ -49,55 +47,38 @@ export class ExcelService {
               const fullName = (row[3] || '').trim(); // Full Name
               const relation = (row[11] || '').trim(); // Relation to HH Head
               const hhHeadCell = (row[2] || '').trim(); // HH Head
-              const enumeratorName = (row[1] || '').trim(); // Enumerator Name
               const nationalId = (row[4] || '').trim(); // National ID
               
-              // إنشاء مفتاح موحد للعائلة بناءً على عدة عوامل
-              let familyIdentifier = '';
-              
-              // الطريقة الأولى: استخدام عمود رب الأسرة إذا كان مملوء
-              if (hhHeadCell) {
-                familyIdentifier = hhHeadCell;
-              }
-              // الطريقة الثانية: استخدام اسم العداد كمعرف للعائلة
-              else if (enumeratorName) {
-                familyIdentifier = enumeratorName;
-              }
-              // الطريقة الثالثة: إذا كان هذا الشخص رب الأسرة
-              else if (relation.toLowerCase().includes('head') || relation.toLowerCase().includes('رب') || relation === '') {
-                familyIdentifier = fullName;
+              // تحديد معرف العائلة: نستخدم عمود رب الأسرة إن وُجد، وإلا نستخدم رب الأسرة الذي تم تعبئته للأسفل
+              const relationStr = relation.toLowerCase();
+              if (relationStr.includes('head') || relationStr.includes('رب')) {
+                // هذا الصف لرب الأسرة
                 currentHeadName = fullName;
-              }
-              // الطريقة الرابعة: استخدام رب الأسرة الحالي
-              else if (currentHeadName) {
-                familyIdentifier = currentHeadName;
-              }
-              // الطريقة الأخيرة: استخدام الاسم الكامل
-              else {
-                familyIdentifier = fullName;
+              } else if (hhHeadCell) {
+                // عضو والأسرة مذكورة بوضوح
+                currentHeadName = hhHeadCell;
+              } else if (!currentHeadName) {
+                // أول صف في الملف بدون تحديد، نعتبره رب أسرة مؤقتًا
                 currentHeadName = fullName;
               }
 
-              // تحديث رب الأسرة الحالي إذا وُجد رب أسرة جديد
-              if (relation.toLowerCase().includes('head') || relation.toLowerCase().includes('رب')) {
-                currentHeadName = fullName;
-                familyIdentifier = fullName;
-              }
-              
-              // إنشاء مفتاح ثابت للعائلة
-              const familyKey = familyIdentifier.replace(/\s+/g, '_').toLowerCase().replace(/[^\w\u0600-\u06FF]/g, '');
+              const familyIdentifier = hhHeadCell || currentHeadName || fullName;
+
+              // مفتاح ثابت للتجميع بدون مسافات أو رموز غير ضرورية (يدعم العربية)
+              const familyKey = familyIdentifier
+                .replace(/\s+/g, '_')
+                .toLowerCase()
+                .replace(/[^\w\u0600-\u06FF]/g, '');
               
               if (!rawFamilyData.has(familyKey)) {
                 rawFamilyData.set(familyKey, []);
               }
               
-              // حفظ البيانات مع المعرف الصحيح للعائلة
               rawFamilyData.get(familyKey)!.push({
                 row,
                 fullName,
                 relation,
-                hhHead: hhHeadCell || familyIdentifier,
-                enumerator: enumeratorName || familyIdentifier,
+                hhHead: familyIdentifier,
                 nationalId,
                 familyHeadName: familyIdentifier,
                 originalRowIndex: rowIndex
@@ -191,7 +172,7 @@ export class ExcelService {
                   gender: row[6] === 'F' || row[6] === 'أ' ? 'F' : 'M',
                   phoneNumber: relationship === 'Head' ? (row[7] || row[9] || '') : '',
                   alternativePhoneNumber: relationship !== 'Head' ? (row[8] || '') : '',
-                  maritalStatus: row[10] || 'Single',
+                  maritalStatus: (() => { const raw = (row[10] || '').toString().trim().toLowerCase(); let v: FamilyMember['maritalStatus'] = 'أعزب'; if (raw) { if (/متزوج|married/.test(raw)) v = 'متزوج'; else if (/أعزب|single|غير متزوج/.test(raw)) v = 'أعزب'; else if (/أرمل|widow/.test(raw)) v = 'أرمل'; else if (/مطلق|divorc/.test(raw)) v = 'مطلق'; else if (/مهجور|separated|abandon/.test(raw)) v = 'مهجور'; } return v; })(),
                   relationship: relationship,
                   hasChronicIllness: 
                     (row[14] || '').includes('Yes') || (row[14] || '').includes('نعم') ||
