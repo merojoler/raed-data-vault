@@ -36,8 +36,9 @@ export class ExcelService {
           const headers = jsonData[0] as string[];
           const dataRows = jsonData.slice(1) as any[][];
 
-          // تجميع البيانات حسب العائلات - مرحلة أولى: جمع البيانات
+          // تجميع البيانات حسب العائلات - مرحلة أولى: جمع البيانات (مع تعبئة تلقائية لاسم رب الأسرة لصفوف العائلة)
           const rawFamilyData = new Map<string, any[]>();
+          let currentHeadName = '';
           
           // أولاً: تجميع جميع الصفوف حسب رب الأسرة
           dataRows.forEach((row, rowIndex) => {
@@ -46,22 +47,25 @@ export class ExcelService {
 
               const fullName = row[3] || ''; // Full Name
               const relation = (row[11] || '').trim(); // Relation to HH Head
-              const hhHead = (row[2] || '').trim(); // HH Head
+              const hhHeadCell = (row[2] || '').trim(); // HH Head (قد تكون فارغة في الصفوف اللاحقة)
               const nationalId = row[4] || ''; // National ID
               
-              // تحديد اسم رب الأسرة
-              let familyHeadName: string;
+              // تحديد اسم رب الأسرة بشكل موثوق مع تعبئة للأسفل
               const relationStr = relation.toLowerCase();
-              
-              if (relationStr.includes('head') || relationStr.includes('رب') || relation === '' || !hhHead) {
-                // هذا الشخص هو رب الأسرة
-                familyHeadName = fullName;
-              } else {
-                // هذا عضو في الأسرة - رب الأسرة مذكور في عمود HH Head
-                familyHeadName = hhHead;
+              if (relationStr.includes('head') || relationStr.includes('رب')) {
+                // هذا الصف لرب الأسرة
+                currentHeadName = fullName;
+              } else if (hhHeadCell) {
+                // عضو والأسرة مذكورة في العمود
+                currentHeadName = hhHeadCell;
+              } else if (!currentHeadName) {
+                // في حال كان أول صف ولم يتم تحديد رب الأسرة بعد
+                currentHeadName = fullName;
               }
+
+              const familyHeadName = currentHeadName || fullName;
               
-              // تنظيف اسم رب الأسرة كمعرف
+              // تنظيف اسم رب الأسرة كمعرف ثابت للتجميع
               const familyKey = familyHeadName.replace(/\s+/g, '_').toLowerCase();
               
               if (!rawFamilyData.has(familyKey)) {
@@ -72,7 +76,7 @@ export class ExcelService {
                 row,
                 fullName,
                 relation,
-                hhHead,
+                hhHead: hhHeadCell,
                 nationalId,
                 familyHeadName
               });
@@ -313,18 +317,18 @@ export class ExcelService {
           exportData.push({
             'Entry Date\nتاريخ الإدخال': family.entryDate,
             'Enumerator Name\nاسم العداد': family.headOfHouseholdName,
-            'HH Head\nرب الأسرة': memberIndex === 0 ? family.headOfHouseholdName : '',
+            'HH Head\nرب الأسرة': family.headOfHouseholdName,
             'Full Name\nالاسم الكامل': member.fullName,
             'National ID\nرقم الهوية': member.identityNumber,
             'Date of Birth\nتاريخ الولادة': new Date(member.birthDate).toLocaleDateString('en-CA'),
             'Gender (F/M)\nالجنس (أ/ذ)': member.gender,
             'Phone Number\nرقم الهاتف': member.phoneNumber || '',
             'Alternative Phone\nرقم الهاتف البديل': member.alternativePhoneNumber || '',
-            'Contact Number\nرقم التواصل': memberIndex === 0 ? family.contactNumber : '',
+            'Contact Number\nرقم التواصل': family.contactNumber,
             'Marital Status\nالحالة الاجتماعية': member.maritalStatus,
             'Relation to HH Head\nصلة القرابة برب الأسرة': relationshipNames[member.relationship] || member.relationship,
             'Unaccompanied child\nطفل غير مصحوب': family.hasUnaccompaniedChild ? 'Yes\nنعم' : '',
-            'Pregnancy/breastfeeding\nحمل/رضاعة': memberIndex === 0 ? (family.isPregnant ? 'حامل' : '') + (family.isBreastfeeding ? ' مرضع' : '') : '',
+            'Pregnancy/breastfeeding\nحمل/رضاعة': (family.isPregnant ? 'حامل' : '') + (family.isBreastfeeding ? ' مرضع' : ''),
             'Diabetes\nسكري': member.chronicIllnesses.diabetes ? 'Yes\nنعم' : '',
             'Hypertension\nضغط الدم': member.chronicIllnesses.hypertension ? 'Yes\nنعم' : '',
             'Heart Disease\nأمراض القلب': member.chronicIllnesses.heartDisease ? 'Yes\nنعم' : '',
