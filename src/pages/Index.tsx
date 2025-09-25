@@ -285,16 +285,37 @@ const Index = () => {
           </div>
         ) : (
           <>
-            {/* عدد النتائج */}
-            <div className="mb-6 text-center">
-              <p className="text-muted-foreground">
-                {searchTerm ? (
-                  <>عرض {filteredFamilies.length} من أصل {families.length} عائلة</>
-                ) : (
-                  <>إجمالي {families.length} عائلة مسجلة</>
-                )}
-              </p>
+          <div className="mb-6 text-center">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
+              <div className="bg-gradient-primary text-white p-4 rounded-lg">
+                <p className="text-2xl font-bold">{families.length}</p>
+                <p className="text-sm opacity-90">إجمالي العائلات</p>
+              </div>
+              <div className="bg-gradient-secondary text-white p-4 rounded-lg">
+                <p className="text-2xl font-bold">{families.reduce((total, family) => total + family.members.length, 0)}</p>
+                <p className="text-sm opacity-90">إجمالي الأفراد</p>
+              </div>
+              <div className="bg-gradient-accent text-white p-4 rounded-lg">
+                <p className="text-2xl font-bold">{families.filter(family => family.hasChildUnder2).length}</p>
+                <p className="text-sm opacity-90">أطفال أقل من سنتين</p>
+              </div>
+              <div className="bg-gradient-tertiary text-white p-4 rounded-lg">
+                <p className="text-2xl font-bold">{families.filter(family => family.hasChild2To5).length}</p>
+                <p className="text-sm opacity-90">أطفال من 2-5 سنوات</p>
+              </div>
             </div>
+          </div>
+
+          {/* عدد النتائج */}
+          <div className="mb-6 text-center">
+            <p className="text-muted-foreground">
+              {searchTerm ? (
+                <>عرض {filteredFamilies.length} من أصل {families.length} عائلة</>
+              ) : (
+                <>عرض جميع العائلات المسجلة</>
+              )}
+            </p>
+          </div>
 
             {/* شبكة البطاقات */}
             {filteredFamilies.length === 0 ? (

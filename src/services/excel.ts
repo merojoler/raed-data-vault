@@ -32,91 +32,63 @@ export class ExcelService {
             throw new Error('الملف فارغ أو لا يحتوي على بيانات صحيحة');
           }
 
-          // استخراج العناوين من الصف الأول
           const headers = jsonData[0] as string[];
           const dataRows = jsonData.slice(1) as any[][];
 
-          // تجميع البيانات حسب العائلات - تجميع يعتمد فقط على "رب الأسرة" مع تعبئة للأسفل
-          const rawFamilyData = new Map<string, any[]>();
-          let currentHeadName = '';
+          // تجميع البيانات حسب هوية رب الأسرة (العمود الثالث)
+          const familiesMap = new Map<string, any[]>();
           
           dataRows.forEach((row, rowIndex) => {
             try {
-              if (!row || row.length === 0 || !row[3]) return; // تخطي الصفوف الفارغة
+              if (!row || row.length === 0 || !row[3]) return;
 
-              const fullName = (row[3] || '').trim(); // Full Name
-              const relation = (row[11] || '').trim(); // Relation to HH Head
-              const hhHeadCell = (row[2] || '').trim(); // HH Head
-              const nationalId = (row[4] || '').trim(); // National ID
-              
-              // تحديد معرف العائلة: نستخدم عمود رب الأسرة إن وُجد، وإلا نستخدم رب الأسرة الذي تم تعبئته للأسفل
-              const relationStr = relation.toLowerCase();
-              if (relationStr.includes('head') || relationStr.includes('رب')) {
-                // هذا الصف لرب الأسرة
-                currentHeadName = fullName;
-              } else if (hhHeadCell) {
-                // عضو والأسرة مذكورة بوضوح
-                currentHeadName = hhHeadCell;
-              } else if (!currentHeadName) {
-                // أول صف في الملف بدون تحديد، نعتبره رب أسرة مؤقتًا
-                currentHeadName = fullName;
-              }
+              // العمود الثالث يحتوي على هوية رب الأسرة
+              const headId = (row[2] || '').toString().trim();
+              if (!headId) return;
 
-              const familyIdentifier = hhHeadCell || currentHeadName || fullName;
-
-              // مفتاح ثابت للتجميع بدون مسافات أو رموز غير ضرورية (يدعم العربية)
-              const familyKey = familyIdentifier
-                .replace(/\s+/g, '_')
-                .toLowerCase()
-                .replace(/[^\w\u0600-\u06FF]/g, '');
-              
-              if (!rawFamilyData.has(familyKey)) {
-                rawFamilyData.set(familyKey, []);
+              if (!familiesMap.has(headId)) {
+                familiesMap.set(headId, []);
               }
               
-              rawFamilyData.get(familyKey)!.push({
+              familiesMap.get(headId)!.push({
                 row,
-                fullName,
-                relation,
-                hhHead: familyIdentifier,
-                nationalId,
-                familyHeadName: familyIdentifier,
                 originalRowIndex: rowIndex
               });
-              
             } catch (error) {
               console.error(`خطأ في معالجة الصف ${rowIndex + 2}:`, error);
             }
           });
 
-          // مرحلة ثانية: إنشاء العائلات من البيانات المجمعة
-          const familiesMap = new Map<string, any>();
+          // إنشاء العائلات من البيانات المجمعة
+          const importedFamilies: FamilyData[] = [];
           
-          rawFamilyData.forEach((familyMembers, familyKey) => {
+          familiesMap.forEach((familyMembers, headId) => {
             try {
               // ترتيب الأعضاء: رب الأسرة أولاً
               const sortedMembers = familyMembers.sort((a, b) => {
-                const aIsHead = a.relation.toLowerCase().includes('head') || a.relation.toLowerCase().includes('رب') || a.relation === '' || !a.hhHead;
-                const bIsHead = b.relation.toLowerCase().includes('head') || b.relation.toLowerCase().includes('رب') || b.relation === '' || !b.hhHead;
+                const aRelation = (a.row[9] || '').toString().toLowerCase();
+                const bRelation = (b.row[9] || '').toString().toLowerCase();
+                
+                const aIsHead = aRelation.includes('رب') || aRelation.includes('head');
+                const bIsHead = bRelation.includes('رب') || bRelation.includes('head');
                 
                 if (aIsHead && !bIsHead) return -1;
                 if (!aIsHead && bIsHead) return 1;
                 return 0;
               });
               
-              // إنشاء العائلة الجديدة
-              const firstMember = sortedMembers[0];
               const today = new Date().toISOString().split('T')[0];
+              const firstMember = sortedMembers[0];
               
-              const family = {
+              const family: FamilyData = {
                 id: `family-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                 entryDate: firstMember.row[0] || today,
-                headOfHouseholdName: firstMember.familyHeadName,
-                headOfHouseholdId: '',
+                headOfHouseholdName: '',
+                headOfHouseholdId: headId,
                 contactNumber: '',
                 members: [],
-                isPregnant: false,
-                isBreastfeeding: false,
+                hasChildUnder2: false,
+                hasChild2To5: false,
                 hasUnaccompaniedChild: false,
                 unaccompaniedChildDetails: undefined,
                 createdAt: new Date(),
@@ -125,24 +97,26 @@ export class ExcelService {
 
               // إضافة جميع الأعضاء
               sortedMembers.forEach((memberData) => {
-                const { row, fullName, relation, nationalId } = memberData;
+                const { row } = memberData;
                 
-                // تحديد العلاقة بدقة
+                const fullName = (row[3] || '').toString().trim();
+                const identityNumber = (row[4] || '').toString().trim();
+                const relationStr = (row[9] || '').toString().toLowerCase().trim();
+                
+                // تحديد العلاقة
                 let relationship: 'Head' | 'Spouse' | 'Son' | 'Daughter';
-                const relationStr = relation.toLowerCase().trim();
-                
-                if (relationStr.includes('head') || relationStr.includes('رب') || relation === '' || !memberData.hhHead) {
+                if (relationStr.includes('رب') || relationStr.includes('head')) {
                   relationship = 'Head';
-                } else if (relationStr.includes('زوج') || relationStr.includes('wife') || relationStr.includes('spouse') || relationStr.includes('زوجة')) {
+                } else if (relationStr.includes('زوج') || relationStr.includes('spouse') || relationStr.includes('wife')) {
                   relationship = 'Spouse';
-                } else if (relationStr.includes('ابن') || relationStr.includes('son') || relationStr.includes('boy')) {
+                } else if (relationStr.includes('ابن') || relationStr.includes('son')) {
                   relationship = 'Son';
-                } else if (relationStr.includes('ابنة') || relationStr.includes('daughter') || relationStr.includes('بنت') || relationStr.includes('girl')) {
+                } else if (relationStr.includes('ابنة') || relationStr.includes('daughter') || relationStr.includes('بنت')) {
                   relationship = 'Daughter';
                 } else {
-                  // تخمين العلاقة بناءً على العمر والجنس
-                  const age = row[32] ? parseInt(row[32]) : 25;
-                  const gender = row[6] === 'F' || row[6] === 'أ' ? 'F' : 'M';
+                  // تخمين بناءً على العمر والجنس
+                  const age = parseInt(row[27]) || 25;
+                  const gender = row[6] === 'F' ? 'F' : 'M';
                   
                   if (age >= 18) {
                     relationship = gender === 'M' ? 'Head' : 'Spouse';
@@ -151,7 +125,7 @@ export class ExcelService {
                   }
                 }
 
-                // إنشاء تاريخ الميلاد
+                // تاريخ الميلاد
                 const birthDateStr = row[5] || '';
                 let birthDate = new Date();
                 if (birthDateStr) {
@@ -161,93 +135,90 @@ export class ExcelService {
                   }
                 }
 
-                const age = row[32] ? parseInt(row[32]) : calculateAge(birthDate.toISOString().split('T')[0]);
+                const age = parseInt(row[27]) || calculateAge(birthDate.toISOString().split('T')[0]);
 
                 const member: FamilyMember = {
                   id: `member-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                   fullName: fullName,
-                  identityNumber: nationalId,
+                  identityNumber: identityNumber,
                   birthDate: birthDate.toISOString().split('T')[0],
                   age: age,
-                  gender: row[6] === 'F' || row[6] === 'أ' ? 'F' : 'M',
-                  phoneNumber: relationship === 'Head' ? (row[7] || row[9] || '') : '',
-                  alternativePhoneNumber: relationship !== 'Head' ? (row[8] || '') : '',
-                  maritalStatus: (() => { const raw = (row[10] || '').toString().trim().toLowerCase(); let v: FamilyMember['maritalStatus'] = 'أعزب'; if (raw) { if (/متزوج|married/.test(raw)) v = 'متزوج'; else if (/أعزب|single|غير متزوج/.test(raw)) v = 'أعزب'; else if (/أرمل|widow/.test(raw)) v = 'أرمل'; else if (/مطلق|divorc/.test(raw)) v = 'مطلق'; else if (/مهجور|separated|abandon/.test(raw)) v = 'مهجور'; } return v; })(),
+                  gender: (row[6] === 'F' || row[6] === 'أ') ? 'F' : 'M',
+                  phoneNumber: relationship === 'Head' ? (row[7] || '') : '',
+                  maritalStatus: (() => {
+                    const raw = (row[8] || '').toString().trim().toLowerCase();
+                    if (/متزوج|married/.test(raw)) return 'متزوج';
+                    if (/أعزب|single/.test(raw)) return 'أعزب';
+                    if (/أرمل|widow/.test(raw)) return 'أرمل';
+                    if (/مطلق|divorc/.test(raw)) return 'مطلق';
+                    if (/مهجور|separated/.test(raw)) return 'مهجور';
+                    return 'أعزب';
+                  })(),
                   relationship: relationship,
-                  hasChronicIllness: 
-                    (row[14] || '').includes('Yes') || (row[14] || '').includes('نعم') ||
-                    (row[15] || '').includes('Yes') || (row[15] || '').includes('نعم') ||
-                    (row[16] || '').includes('Yes') || (row[16] || '').includes('نعم') ||
-                    (row[18] || '').includes('Yes') || (row[18] || '').includes('نعم') ||
-                    (row[19] || '').includes('Yes') || (row[19] || '').includes('نعم') ||
-                    (row[20] || '').includes('Yes') || (row[20] || '').includes('نعم') ||
-                    (row[21] || '').includes('Yes') || (row[21] || '').includes('نعم') ||
-                    (row[22] || '').includes('Yes') || (row[22] || '').includes('نعم'),
+                  hasChronicIllness: [13,14,15,16,17,18,19,20].some(i => 
+                    (row[i] || '').toString().toLowerCase().includes('yes') || 
+                    (row[i] || '').toString().includes('نعم')
+                  ),
                   chronicIllnesses: {
-                    diabetes: (row[14] || '').includes('Yes') || (row[14] || '').includes('نعم'),
-                    hypertension: (row[15] || '').includes('Yes') || (row[15] || '').includes('نعم'),
-                    heartDisease: (row[16] || '').includes('Yes') || (row[16] || '').includes('نعم'),
-                    asthma: (row[18] || '').includes('Yes') || (row[18] || '').includes('نعم'),
-                    cancer: (row[19] || '').includes('Yes') || (row[19] || '').includes('نعم'),
-                    kidneyDisease: (row[20] || '').includes('Yes') || (row[20] || '').includes('نعم'),
-                    hiv: (row[21] || '').includes('Yes') || (row[21] || '').includes('نعم'),
-                    arthritis: (row[22] || '').includes('Yes') || (row[22] || '').includes('نعم')
+                    diabetes: (row[13] || '').toString().toLowerCase().includes('yes') || (row[13] || '').includes('نعم'),
+                    hypertension: (row[14] || '').toString().toLowerCase().includes('yes') || (row[14] || '').includes('نعم'),
+                    heartDisease: (row[15] || '').toString().toLowerCase().includes('yes') || (row[15] || '').includes('نعم'),
+                    asthma: (row[16] || '').toString().toLowerCase().includes('yes') || (row[16] || '').includes('نعم'),
+                    cancer: (row[17] || '').toString().toLowerCase().includes('yes') || (row[17] || '').includes('نعم'),
+                    kidneyDisease: (row[18] || '').toString().toLowerCase().includes('yes') || (row[18] || '').includes('نعم'),
+                    hiv: (row[19] || '').toString().toLowerCase().includes('yes') || (row[19] || '').includes('نعم'),
+                    arthritis: (row[20] || '').toString().toLowerCase().includes('yes') || (row[20] || '').includes('نعم')
                   },
-                  hasDisabilities: 
-                    (row[23] || '').includes('Yes') || (row[23] || '').includes('نعم') ||
-                    (row[24] || '').includes('Yes') || (row[24] || '').includes('نعم') ||
-                    (row[26] || '').includes('Yes') || (row[26] || '').includes('نعم') ||
-                    (row[27] || '').includes('Yes') || (row[27] || '').includes('نعم') ||
-                    (row[28] || '').includes('Yes') || (row[28] || '').includes('نعم'),
+                  hasDisabilities: [21,22,23,24,25].some(i => 
+                    (row[i] || '').toString().toLowerCase().includes('yes') || 
+                    (row[i] || '').toString().includes('نعم')
+                  ),
                   disabilities: {
-                    physical: (row[23] || '').includes('Yes') || (row[23] || '').includes('نعم'),
-                    visual: (row[24] || '').includes('Yes') || (row[24] || '').includes('نعم'),
-                    hearing: (row[26] || '').includes('Yes') || (row[26] || '').includes('نعم'),
-                    intellectual: (row[27] || '').includes('Yes') || (row[27] || '').includes('نعم'),
-                    mentalPsychological: (row[28] || '').includes('Yes') || (row[28] || '').includes('نعم')
+                    physical: (row[21] || '').toString().toLowerCase().includes('yes') || (row[21] || '').includes('نعم'),
+                    visual: (row[22] || '').toString().toLowerCase().includes('yes') || (row[22] || '').includes('نعم'),
+                    hearing: (row[23] || '').toString().toLowerCase().includes('yes') || (row[23] || '').includes('نعم'),
+                    intellectual: (row[24] || '').toString().toLowerCase().includes('yes') || (row[24] || '').includes('نعم'),
+                    mentalPsychological: (row[25] || '').toString().toLowerCase().includes('yes') || (row[25] || '').includes('نعم')
                   },
-                  isUXOVictim: (row[29] || '').includes('Yes') || (row[29] || '').includes('نعم'),
-                  hasStableIncome: (row[30] || '').includes('Yes') || (row[30] || '').includes('نعم')
+                  isUXOVictim: (row[26] || '').toString().toLowerCase().includes('yes') || (row[26] || '').includes('نعم'),
+                  hasStableIncome: (row[27] || '').toString().toLowerCase().includes('yes') || (row[27] || '').includes('نعم'),
+                  // للزوجة فقط
+                  isPregnant: relationship === 'Spouse' ? 
+                    ((row[11] || '').includes('حامل') || (row[11] || '').includes('pregnant')) : undefined,
+                  isBreastfeeding: relationship === 'Spouse' ? 
+                    ((row[12] || '').includes('مرضع') || (row[12] || '').includes('breastfeeding')) : undefined
                 };
 
                 family.members.push(member);
 
-                // تحديث معلومات العائلة حسب رب الأسرة
+                // تحديث معلومات العائلة
                 if (relationship === 'Head') {
                   family.headOfHouseholdName = member.fullName;
-                  family.headOfHouseholdId = member.identityNumber;
-                  family.contactNumber = member.phoneNumber || row[9] || '';
-                }
-
-                // تحديث حالة الحمل والرضاعة
-                const pregnancyInfo = row[13] || '';
-                if (pregnancyInfo.includes('حامل') || pregnancyInfo.includes('pregnant')) {
-                  family.isPregnant = true;
-                }
-                if (pregnancyInfo.includes('مرضع') || pregnancyInfo.includes('breastfeeding')) {
-                  family.isBreastfeeding = true;
+                  family.contactNumber = member.phoneNumber || '';
                 }
 
                 // تحديث حالة الطفل غير المصحوب
-                if ((row[12] || '').includes('Yes') || (row[12] || '').includes('نعم')) {
+                if ((row[10] || '').toString().toLowerCase().includes('yes') || (row[10] || '').includes('نعم')) {
                   family.hasUnaccompaniedChild = true;
                 }
+
+                // تحديث الأطفال الصغار
+                if (age < 2) family.hasChildUnder2 = true;
+                if (age >= 2 && age <= 5) family.hasChild2To5 = true;
               });
 
-              // ترتيب الأعضاء داخل العائلة
-              family.members.sort((a: FamilyMember, b: FamilyMember) => {
+              // ترتيب الأعضاء
+              family.members.sort((a, b) => {
                 const order = { 'Head': 0, 'Spouse': 1, 'Son': 2, 'Daughter': 3 };
                 return order[a.relationship] - order[b.relationship];
               });
 
-              familiesMap.set(familyKey, family);
+              importedFamilies.push(family);
               
             } catch (error) {
-              console.error(`خطأ في معالجة العائلة ${familyKey}:`, error);
+              console.error(`خطأ في معالجة العائلة ${headId}:`, error);
             }
           });
-
-          const importedFamilies = Array.from(familiesMap.values());
 
           resolve(importedFamilies);
           
@@ -281,35 +252,6 @@ export class ExcelService {
         });
         
         sortedMembers.forEach((member, memberIndex) => {
-          const chronicIllnessList = Object.entries(member.chronicIllnesses)
-            .filter(([_, value]) => value)
-            .map(([key, _]) => {
-              const illnessNames: Record<string, string> = {
-                diabetes: 'سكري',
-                hypertension: 'ضغط',
-                heartDisease: 'أمراض قلب',
-                asthma: 'أزمة',
-                cancer: 'سرطان',
-                kidneyDisease: 'أمراض كلى',
-                hiv: 'إيدز',
-                arthritis: 'التهاب مفاصل'
-              };
-              return illnessNames[key] || key;
-            });
-          
-          const disabilitiesList = Object.entries(member.disabilities)
-            .filter(([_, value]) => value)
-            .map(([key, _]) => {
-              const disabilityNames: Record<string, string> = {
-                physical: 'حركية',
-                visual: 'بصرية',
-                hearing: 'سمعية',
-                intellectual: 'ذهنية',
-                mentalPsychological: 'عقلية - نفسية'
-              };
-              return disabilityNames[key] || key;
-            });
-          
           const relationshipNames: Record<string, string> = {
             'Head': 'رب الأسرة',
             'Spouse': 'زوجة',
@@ -319,23 +261,21 @@ export class ExcelService {
           
           exportData.push({
             'Entry Date\nتاريخ الإدخال': family.entryDate,
-            'Enumerator Name\nاسم العداد': family.headOfHouseholdName, // نفس اسم رب الأسرة لجميع الأعضاء
-            'HH Head\nرب الأسرة': family.headOfHouseholdName, // نفس اسم رب الأسرة لجميع الأعضاء
+            'Data Entry Person\nاسم مدخل البيانات': 'Raed ALbakri',
+            'HH Head ID\nهوية رب الأسرة': family.headOfHouseholdId,
             'Full Name\nالاسم الكامل': member.fullName,
             'National ID\nرقم الهوية': member.identityNumber,
             'Date of Birth\nتاريخ الولادة': new Date(member.birthDate).toLocaleDateString('en-CA'),
-            'Gender (F/M)\nالجنس (أ/ذ)': member.gender,
-            'Phone Number\nرقم الهاتف': member.phoneNumber || '',
-            'Alternative Phone\nرقم الهاتف البديل': member.alternativePhoneNumber || '',
+            'Gender (M/F)\nالجنس (ذ/أ)': member.gender,
             'Contact Number\nرقم التواصل': family.contactNumber,
             'Marital Status\nالحالة الاجتماعية': member.maritalStatus,
             'Relation to HH Head\nصلة القرابة برب الأسرة': relationshipNames[member.relationship] || member.relationship,
-            'Unaccompanied child\nطفل غير مصحوب': family.hasUnaccompaniedChild ? 'Yes\nنعم' : '',
-            'Pregnancy/breastfeeding\nحمل/رضاعة': (family.isPregnant ? 'حامل' : '') + (family.isBreastfeeding ? (family.isPregnant ? ' مرضع' : 'مرضع') : ''),
+            'Unaccompanied child\nطفل غير مصحوب': family.hasUnaccompaniedChild ? (memberIndex === 0 ? 'Yes\nنعم' : '') : '',
+            'Pregnant woman\nامرأة حامل': member.relationship === 'Spouse' && member.isPregnant ? 'Yes\nنعم' : '',
+            'Breastfeeding woman\nامرأة مرضع': member.relationship === 'Spouse' && member.isBreastfeeding ? 'Yes\nنعم' : '',
             'Diabetes\nسكري': member.chronicIllnesses.diabetes ? 'Yes\nنعم' : '',
             'Hypertension\nضغط الدم': member.chronicIllnesses.hypertension ? 'Yes\nنعم' : '',
             'Heart Disease\nأمراض القلب': member.chronicIllnesses.heartDisease ? 'Yes\nنعم' : '',
-            'Chronic Illness\nأمراض مزمنة': member.hasChronicIllness ? 'Yes\nنعم' : '',
             'Asthma\nأزمة': member.chronicIllnesses.asthma ? 'Yes\nنعم' : '',
             'Cancer\nسرطان': member.chronicIllnesses.cancer ? 'Yes\nنعم' : '',
             'Chronic Kidney Disease\nأمراض الكلى المزمنة': member.chronicIllnesses.kidneyDisease ? 'Yes\nنعم' : '',
@@ -343,14 +283,14 @@ export class ExcelService {
             'Arthritis\nالتهاب المفاصل': member.chronicIllnesses.arthritis ? 'Yes\nنعم' : '',
             'Physical Disability\nإعاقة حركية': member.disabilities.physical ? 'Yes\nنعم' : '',
             'Vision Loss\nفقدان البصر': member.disabilities.visual ? 'Yes\nنعم' : '',
-            'Disabilities\nإعاقات': member.hasDisabilities ? 'Yes\nنعم' : '',
             'Hearing Loss\nفقدان السمع': member.disabilities.hearing ? 'Yes\nنعم' : '',
             'Intellectual Disability\nإعاقة ذهنية': member.disabilities.intellectual ? 'Yes\nنعم' : '',
             'Mental/Psychological\nعقلية/نفسية': member.disabilities.mentalPsychological ? 'Yes\nنعم' : '',
             'UXO Victim\nضحية ذخائر غير منفجرة': member.isUXOVictim ? 'Yes\nنعم' : '',
             'Employment/Income\nعمل/دخل': member.hasStableIncome ? 'Yes\nنعم' : '',
-            'Calculated Field\nحقل محسوب': '',
-            'Age\nالعمر': member.age.toString()
+            'Age\nالعمر': member.age.toString(),
+            'Child under 2\nطفل أقل من سنتين': member.age < 2 ? 'Yes\nنعم' : '',
+            'Child 2-5 years\nطفل من 2-5 سنوات': (member.age >= 2 && member.age <= 5) ? 'Yes\nنعم' : ''
           });
         });
       });
@@ -358,41 +298,56 @@ export class ExcelService {
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.json_to_sheet(exportData);
       
+      // تنسيق خاص لرب الأسرة - خلفية صفراء
+      const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:Z1');
+      const headRows: number[] = [];
+      
+      exportData.forEach((row, index) => {
+        if (row['Relation to HH Head\nصلة القرابة برب الأسرة'] === 'رب الأسرة') {
+          headRows.push(index + 2); // +2 because Excel is 1-indexed and has header row
+        }
+      });
+
+      // إضافة التنسيق للخلفية الصفراء
+      if (!ws['!rows']) ws['!rows'] = [];
+      headRows.forEach(rowNum => {
+        if (!ws['!rows'][rowNum - 1]) ws['!rows'][rowNum - 1] = {};
+        // Note: XLSX doesn't support direct styling like this, but we keep for reference
+      });
+      
       // تحسين عرض الأعمدة
       const colWidths = [
         { wch: 12 }, // Entry Date
-        { wch: 20 }, // Enumerator Nam
-        { wch: 20 }, // HH Head
+        { wch: 15 }, // Data Entry Person
+        { wch: 15 }, // HH Head ID
         { wch: 25 }, // Full Name
         { wch: 12 }, // National ID
         { wch: 12 }, // Date of Birth
         { wch: 8 },  // Gender
-        { wch: 15 }, // Phone Number
-        { wch: 15 }, // Alternative Phone
-        { wch: 12 }, // Contact Num
-        { wch: 12 }, // Marital Stat
+        { wch: 15 }, // Contact Number
+        { wch: 12 }, // Marital Status
         { wch: 15 }, // Relation to HH Head
         { wch: 15 }, // Unaccompanied child
-        { wch: 20 }, // Pregnancy/breastfeeding
-        { wch: 8 },  // Diabet
-        { wch: 10 }, // Hypertens
-        { wch: 10 }, // Heart disea
-        { wch: 15 }, // Chronic illness
-        { wch: 8 },  // Asthm
+        { wch: 15 }, // Pregnant woman
+        { wch: 15 }, // Breastfeeding woman
+        { wch: 8 },  // Diabetes
+        { wch: 10 }, // Hypertension
+        { wch: 10 }, // Heart Disease
+        { wch: 8 },  // Asthma
         { wch: 8 },  // Cancer
-        { wch: 15 }, // Chronic kidney disea
-        { wch: 8 },  // HIV/AID
-        { wch: 8 },  // Arthrit
-        { wch: 8 },  // Physic
-        { wch: 10 }, // Vision Lo
-        { wch: 15 }, // Disabilities
-        { wch: 10 }, // Hearing Lo
-        { wch: 10 }, // Intellect
-        { wch: 15 }, // Mental/psychosoc
+        { wch: 15 }, // Chronic Kidney Disease
+        { wch: 8 },  // HIV/AIDS
+        { wch: 8 },  // Arthritis
+        { wch: 8 },  // Physical Disability
+        { wch: 10 }, // Vision Loss
+        { wch: 10 }, // Hearing Loss
+        { wch: 10 }, // Intellectual Disability
+        { wch: 15 }, // Mental/Psychological
         { wch: 15 }, // UXO Victim
         { wch: 15 }, // Employment/Income
-        { wch: 10 }, // Calculated Field
-        { wch: 5 }   // Age
+        { wch: 5 },  // Age
+        { wch: 15 }, // Child under 2
+        { wch: 15 }  // Child 2-5 years
       ];
       ws['!cols'] = colWidths;
 

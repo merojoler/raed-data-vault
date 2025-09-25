@@ -104,14 +104,24 @@ export const FamilyCard: React.FC<FamilyCardProps> = ({ family, onEdit, onDelete
 
         {/* حالات خاصة */}
         <div className="flex flex-wrap gap-2">
-          {family.isPregnant && (
+          {spouse?.isPregnant && (
             <Badge variant="secondary" className="text-xs bg-pink-100 text-pink-700">
               حامل
             </Badge>
           )}
-          {family.isBreastfeeding && (
+          {spouse?.isBreastfeeding && (
             <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700">
               مرضع
+            </Badge>
+          )}
+          {family.hasChildUnder2 && (
+            <Badge variant="secondary" className="text-xs bg-green-100 text-green-700">
+              طفل أقل من سنتين
+            </Badge>
+          )}
+          {family.hasChild2To5 && (
+            <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-700">
+              طفل من 2-5 سنوات
             </Badge>
           )}
           {family.hasUnaccompaniedChild && (

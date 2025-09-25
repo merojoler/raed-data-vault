@@ -26,7 +26,9 @@ const maritalStatusOptions = [
 ] as const;
 
 const familyMemberSchema = z.object({
-  fullName: z.string().min(1, 'الاسم مطلوب'),
+  fullName: z.string().refine((val) => val.trim().split(/\s+/).length === 4, {
+    message: 'الاسم يجب أن يكون رباعي (4 أسماء)'
+  }),
   identityNumber: z.string().regex(/^\d{9}$/, 'رقم الهوية يجب أن يكون 9 أرقام'),
   birthDate: z.string().min(1, 'تاريخ الميلاد مطلوب'),
   gender: z.enum(['M', 'F']),
@@ -35,7 +37,10 @@ const familyMemberSchema = z.object({
   
   // معلومات التواصل - رقم الهاتف مطلوب لرب الأسرة فقط
   phoneNumber: z.string().optional(),
-  alternativePhoneNumber: z.string().optional(),
+  
+  // معلومات خاصة بالزوجة
+  isPregnant: z.boolean().optional(),
+  isBreastfeeding: z.boolean().optional(),
   
   // الأمراض المزمنة
   hasChronicIllness: z.boolean(),
@@ -63,21 +68,21 @@ const familyMemberSchema = z.object({
   isUXOVictim: z.boolean(),
   hasStableIncome: z.boolean()
 }).refine((data) => {
-  // التحقق من أن رب الأسرة لديه رقم هاتف
+  // التحقق من أن رب الأسرة لديه رقم هاتف 10 أرقام
   if (data.relationship === 'Head') {
-    return data.phoneNumber && data.phoneNumber.trim().length > 0;
+    return data.phoneNumber && /^\d{10}$/.test(data.phoneNumber);
   }
   return true;
 }, {
-  message: 'رقم الهاتف مطلوب لرب الأسرة',
+  message: 'رقم الهاتف يجب أن يكون 10 أرقام لرب الأسرة',
   path: ['phoneNumber']
 });
 
 const familySchema = z.object({
   members: z.array(familyMemberSchema).min(1, 'يجب إضافة فرد واحد على الأقل'),
   
-  isPregnant: z.boolean(),
-  isBreastfeeding: z.boolean(),
+  hasChildUnder2: z.boolean(),
+  hasChild2To5: z.boolean(),
   
   hasUnaccompaniedChild: z.boolean(),
   unaccompaniedChildName: z.string().optional(),
@@ -124,7 +129,8 @@ export const FamilyForm: React.FC<FamilyFormProps> = ({
         relationship: member.relationship,
         maritalStatus: member.maritalStatus,
         phoneNumber: member.phoneNumber || '',
-        alternativePhoneNumber: member.alternativePhoneNumber || '',
+        isPregnant: member.isPregnant || false,
+        isBreastfeeding: member.isBreastfeeding || false,
         hasChronicIllness: member.hasChronicIllness,
         chronicIllnesses: member.chronicIllnesses,
         hasDisabilities: member.hasDisabilities,
@@ -139,7 +145,8 @@ export const FamilyForm: React.FC<FamilyFormProps> = ({
         relationship: 'Head' as const,
         maritalStatus: 'متزوج' as const,
         phoneNumber: '',
-        alternativePhoneNumber: '',
+        isPregnant: false,
+        isBreastfeeding: false,
         hasChronicIllness: false,
         chronicIllnesses: {
           diabetes: false,
@@ -162,8 +169,8 @@ export const FamilyForm: React.FC<FamilyFormProps> = ({
         isUXOVictim: false,
         hasStableIncome: false
       }],
-      isPregnant: existingFamily?.isPregnant || false,
-      isBreastfeeding: existingFamily?.isBreastfeeding || false,
+      hasChildUnder2: existingFamily?.hasChildUnder2 || false,
+      hasChild2To5: existingFamily?.hasChild2To5 || false,
       hasUnaccompaniedChild: existingFamily?.hasUnaccompaniedChild || false,
       unaccompaniedChildName: existingFamily?.unaccompaniedChildDetails?.name || '',
       unaccompaniedChildDetails: existingFamily?.unaccompaniedChildDetails?.details || ''
@@ -176,6 +183,8 @@ export const FamilyForm: React.FC<FamilyFormProps> = ({
   });
 
   const watchHasUnaccompaniedChild = form.watch('hasUnaccompaniedChild');
+  const watchHasChildUnder2 = form.watch('hasChildUnder2');
+  const watchHasChild2To5 = form.watch('hasChild2To5');
 
   const onSubmit = async (data: FamilyFormData) => {
     setIsLoading(true);
@@ -185,7 +194,14 @@ export const FamilyForm: React.FC<FamilyFormProps> = ({
       // استخراج معلومات رب الأسرة من العضو الأول
       const headOfHousehold = data.members.find(m => m.relationship === 'Head') || data.members[0];
       
-      const familyData: FamilyData = {
+              // تحديث معلومات الأطفال تلقائياً
+              data.members.forEach(member => {
+                const memberAge = calculateAge(member.birthDate);
+                if (memberAge < 2) data.hasChildUnder2 = true;
+                if (memberAge >= 2 && memberAge <= 5) data.hasChild2To5 = true;
+              });
+              
+              const familyData: FamilyData = {
         id: existingFamily?.id || crypto.randomUUID(),
         entryDate: existingFamily?.entryDate || today,
         headOfHouseholdName: headOfHousehold.fullName,
@@ -201,7 +217,8 @@ export const FamilyForm: React.FC<FamilyFormProps> = ({
           relationship: member.relationship,
           maritalStatus: member.maritalStatus,
           phoneNumber: member.phoneNumber,
-          alternativePhoneNumber: member.alternativePhoneNumber,
+          isPregnant: member.isPregnant,
+          isBreastfeeding: member.isBreastfeeding,
           hasChronicIllness: member.hasChronicIllness,
           chronicIllnesses: {
             diabetes: member.chronicIllnesses.diabetes || false,
@@ -224,8 +241,8 @@ export const FamilyForm: React.FC<FamilyFormProps> = ({
           isUXOVictim: member.isUXOVictim,
           hasStableIncome: member.hasStableIncome
         })),
-        isPregnant: data.isPregnant,
-        isBreastfeeding: data.isBreastfeeding,
+        hasChildUnder2: data.hasChildUnder2,
+        hasChild2To5: data.hasChild2To5,
         hasUnaccompaniedChild: data.hasUnaccompaniedChild,
         unaccompaniedChildDetails: data.hasUnaccompaniedChild ? {
           name: data.unaccompaniedChildName || '',
@@ -255,15 +272,43 @@ export const FamilyForm: React.FC<FamilyFormProps> = ({
   };
 
   const addFamilyMember = () => {
+    const currentCount = fields.length;
+    let newRelationship: 'Head' | 'Spouse' | 'Son' | 'Daughter' = 'Son';
+    let newMaritalStatus: 'متزوج' | 'أعزب' | 'أرمل' | 'مطلق' | 'مهجور' = 'أعزب';
+    let newGender: 'M' | 'F' = 'M';
+    
+    if (currentCount === 1) {
+      // العضو الثاني = زوجة متزوجة
+      newRelationship = 'Spouse';
+      newMaritalStatus = 'متزوج';
+      newGender = 'F';
+    } else if (currentCount === 2) {
+      // العضو الثالث = ابن أعزب
+      newRelationship = 'Son';
+      newMaritalStatus = 'أعزب';
+      newGender = 'M';
+    } else if (currentCount === 3) {
+      // العضو الرابع = ابنة عزباء
+      newRelationship = 'Daughter';  
+      newMaritalStatus = 'أعزب';
+      newGender = 'F';
+    } else {
+      // باقي الأعضاء = ابنة عزباء (يمكن التعديل يدوياً)
+      newRelationship = 'Daughter';
+      newMaritalStatus = 'أعزب';
+      newGender = 'F';
+    }
+    
     append({
       fullName: '',
       identityNumber: '',
       birthDate: '',
-      gender: 'M',
-      relationship: 'Son',
-      maritalStatus: 'أعزب',
+      gender: newGender,
+      relationship: newRelationship,
+      maritalStatus: newMaritalStatus,
       phoneNumber: '',
-      alternativePhoneNumber: '',
+      isPregnant: false,
+      isBreastfeeding: false,
       hasChronicIllness: false,
       chronicIllnesses: {
         diabetes: false,
@@ -412,28 +457,48 @@ export const FamilyForm: React.FC<FamilyFormProps> = ({
                       />
                     )}
                     
-                    {/* رقم الهاتف البديل - يظهر للجميع */}
-                    <FormField
-                      control={form.control}
-                      name={`members.${index}.alternativePhoneNumber`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="flex items-center gap-1">
-                            <Phone className="h-3 w-3" />
-                            {form.watch(`members.${index}.relationship`) === 'Head' ? 'رقم الهاتف البديل' : 'رقم الهاتف'}
-                            {form.watch(`members.${index}.relationship`) !== 'Head' && ' (اختياري)'}
-                          </FormLabel>
-                          <FormControl>
-                            <Input 
-                              placeholder={`أدخل ${form.watch(`members.${index}.relationship`) === 'Head' ? 'رقم الهاتف البديل' : 'رقم الهاتف'}`} 
-                              className="text-right" 
-                              {...field} 
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                     {/* معلومات خاصة بالزوجة - الحمل والرضاعة */}
+                    {form.watch(`members.${index}.relationship`) === 'Spouse' && (
+                      <>
+                        <FormField
+                          control={form.control}
+                          name={`members.${index}.isPregnant`}
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                              <FormControl>
+                                <Checkbox 
+                                  checked={field.value} 
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                              <FormLabel className="flex items-center gap-1">
+                                <Baby className="h-3 w-3" />
+                                حامل
+                              </FormLabel>
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={form.control}
+                          name={`members.${index}.isBreastfeeding`}
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                              <FormControl>
+                                <Checkbox 
+                                  checked={field.value} 
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                              <FormLabel className="flex items-center gap-1">
+                                <Heart className="h-3 w-3" />
+                                مرضع
+                              </FormLabel>
+                            </FormItem>
+                          )}
+                        />
+                      </>
+                    )}
                   </div>
 
                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -786,7 +851,7 @@ export const FamilyForm: React.FC<FamilyFormProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
-                  name="isPregnant"
+                  name="hasChildUnder2"
                   render={({ field }) => (
                     <FormItem className="flex flex-row items-center space-x-3 space-y-0 p-4 border border-border rounded-lg">
                       <FormControl>
@@ -796,7 +861,7 @@ export const FamilyForm: React.FC<FamilyFormProps> = ({
                         />
                       </FormControl>
                       <FormLabel className="text-base cursor-pointer">
-                        يوجد امرأة حامل في العائلة
+                        يوجد طفل أقل من سنتين
                       </FormLabel>
                     </FormItem>
                   )}
@@ -804,7 +869,7 @@ export const FamilyForm: React.FC<FamilyFormProps> = ({
 
                 <FormField
                   control={form.control}
-                  name="isBreastfeeding"
+                  name="hasChild2To5"
                   render={({ field }) => (
                     <FormItem className="flex flex-row items-center space-x-3 space-y-0 p-4 border border-border rounded-lg">
                       <FormControl>
@@ -814,7 +879,7 @@ export const FamilyForm: React.FC<FamilyFormProps> = ({
                         />
                       </FormControl>
                       <FormLabel className="text-base cursor-pointer">
-                        يوجد امرأة مرضع في العائلة
+                        يوجد طفل من 2-5 سنوات
                       </FormLabel>
                     </FormItem>
                   )}

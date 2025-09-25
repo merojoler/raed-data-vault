@@ -36,6 +36,10 @@ export interface FamilyMember {
   
   isUXOVictim: boolean;
   hasStableIncome: boolean;
+  
+  // معلومات إضافية للزوجة فقط
+  isPregnant?: boolean;
+  isBreastfeeding?: boolean;
 }
 
 export interface FamilyData {
@@ -52,9 +56,11 @@ export interface FamilyData {
   // أفراد العائلة (يشمل رب الأسرة)
   members: FamilyMember[];
   
-  // معلومات خاصة
-  isPregnant: boolean;
-  isBreastfeeding: boolean;
+  // معلومات خاصة (تم نقل الحمل والرضاعة لأفراد العائلة)
+  
+  // أطفال صغار
+  hasChildUnder2: boolean;
+  hasChild2To5: boolean;
   
   // طفل غير مصحوب
   hasUnaccompaniedChild: boolean;
